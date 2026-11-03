@@ -91,8 +91,8 @@ td,th,.num{font-variant-numeric:tabular-nums}
 main{padding-block:26px 60px}
 .view{display:grid;gap:20px;align-content:start}
 .view[hidden]{display:none!important}
-.page-head{display:flex;justify-content:space-between;align-items:flex-end;gap:12px 24px;flex-wrap:wrap;margin:-26px calc(-1 * var(--gut)) 0;padding:22px var(--gut) 18px;background:var(--head-bg);border-bottom:3px solid var(--head-line)}
-.page-head h1{color:var(--head-ink)}
+.page-head{display:flex;justify-content:space-between;align-items:center;gap:12px 24px;flex-wrap:wrap;margin:-26px calc(-1 * var(--gut)) 0;padding:22px var(--gut) 18px;background:var(--head-bg);border-bottom:3px solid var(--head-line)}
+.page-head h1{color:var(--head-ink);font-weight:700}
 #ghPanel:not([hidden]) ~ .view .page-head{margin-top:0}
 .page-head p{color:var(--ink);opacity:.8;margin-top:4px;max-width:70ch}
 
@@ -263,7 +263,7 @@ tr.confirm td{background:var(--bad-soft)}
       <!-- INVENTORY -->
       <section id="view-inventory" class="view" role="tabpanel" aria-labelledby="tab-inventory">
         <div class="page-head">
-          <div><h1>Inventory</h1><p>Devices and components the lab lends out. Change stock amounts straight in the table.</p></div>
+          <h1>Inventory</h1>
           <div class="toolbar">
             <input type="search" id="invSearch" placeholder="Search devices" aria-label="Search devices">
             <button class="btn" id="invExport" type="button">Export to Excel</button>
@@ -289,7 +289,7 @@ tr.confirm td{background:var(--bad-soft)}
       <!-- NEW LOAN -->
       <section id="view-new" class="view" role="tabpanel" aria-labelledby="tab-new" hidden>
         <div class="page-head">
-          <div><h1>New loan</h1><p>Fill in who is borrowing and pick the equipment. After saving, download the loan record as PDF or Excel for signing.</p></div>
+          <h1>New loan</h1>
         </div>
         <div id="savedBox"></div>
         <form id="loanForm" autocomplete="off" class="loan-grid">
@@ -329,7 +329,7 @@ tr.confirm td{background:var(--bad-soft)}
       <!-- LOANS -->
       <section id="view-loans" class="view" role="tabpanel" aria-labelledby="tab-loans" hidden>
         <div class="page-head">
-          <div><h1>Loans</h1><p>What is out, what is overdue, and what has come back. Open a loan to check equipment back in.</p></div>
+          <h1>Loans</h1>
           <div class="toolbar">
             <div class="seg" id="loanFilter" role="group" aria-label="Filter loans">
               <button type="button" data-f="open" aria-pressed="true">Out now</button>
