@@ -1,0 +1,1091 @@
+<title>ICT Lab Loan Desk</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
+<style>
+/* Layout: sticky tab bar over a working surface; inventory = form rail + stock table, loans = list + return-check panel. Label-maker yellow marks tags and the active tab. */
+:root{
+  --bg:#f1f2ee; --surface:#ffffff; --sunken:#e8eae4; --ink:#1b1f23; --muted:#5b636a; --line:#d5d9d1;
+  --accent:#f3c234; --accent-ink:#231b00; --focus:#2b62d9;
+  --ok:#256c45; --ok-soft:#dcefe3; --warn:#8a5300; --warn-soft:#fbecd2; --bad:#a3221b; --bad-soft:#f8dedb; --info-soft:#e3e8f6;
+  --f-display:"Archivo","Arial Narrow",system-ui,sans-serif;
+  --f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+  --r:6px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#14171a; --surface:#1c2024; --sunken:#111417; --ink:#e7eaec; --muted:#9aa3aa; --line:#2e3439;
+  --accent:#f3c234; --accent-ink:#1d1600; --focus:#7aa2ff;
+  --ok:#6fcf97; --ok-soft:#1d3327; --warn:#f0b257; --warn-soft:#3a2c14; --bad:#ff8a80; --bad-soft:#3d1f1d; --info-soft:#232b3d;
+  color-scheme:dark }}
+:root[data-theme="dark"]{
+  --bg:#14171a; --surface:#1c2024; --sunken:#111417; --ink:#e7eaec; --muted:#9aa3aa; --line:#2e3439;
+  --accent:#f3c234; --accent-ink:#1d1600; --focus:#7aa2ff;
+  --ok:#6fcf97; --ok-soft:#1d3327; --warn:#f0b257; --warn-soft:#3a2c14; --bad:#ff8a80; --bad-soft:#3d1f1d; --info-soft:#232b3d;
+  color-scheme:dark }
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:14px;line-height:1.45}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--surface)}
+.wrap{max-width:1240px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+h1,h2,h3{font-family:var(--f-display);margin:0;text-wrap:balance;letter-spacing:-.01em}
+h2{font-size:1.25rem}
+h3{font-size:1rem}
+.mono{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.muted{color:var(--muted)}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+
+/* top bar */
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--surface);border-bottom:1px solid var(--line)}
+.top-in{display:flex;align-items:center;justify-content:space-between;gap:12px 20px;flex-wrap:wrap;padding-block:10px}
+.brand{display:flex;align-items:center;gap:10px}
+.tag{font-family:var(--f-mono);font-weight:500;font-size:.78rem;letter-spacing:.08em;background:var(--accent);color:var(--accent-ink);padding:3px 8px;border-radius:3px;box-shadow:inset 0 -2px 0 rgba(0,0,0,.12)}
+.brand h1{font-size:1.3rem;font-weight:800}
+.tabs{display:flex;gap:4px;flex-wrap:wrap}
+.tabs button{border:0;background:none;padding:8px 12px;border-radius:var(--r);cursor:pointer;font-weight:600;color:var(--muted);display:flex;align-items:center;gap:6px}
+.tabs button:hover{background:var(--sunken);color:var(--ink)}
+.tabs button[aria-selected="true"]{color:var(--ink);background:var(--sunken);box-shadow:inset 0 -3px 0 var(--accent)}
+.tools{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.tool{border:1px solid var(--line);background:var(--bg);border-radius:99px;padding:5px 11px;cursor:pointer;font-size:.82rem;font-weight:600;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.tool:hover{background:var(--sunken)}
+.tool .dot{width:8px;height:8px;border-radius:50%;background:var(--muted)}
+.tool .dot.ok{background:var(--ok)}.tool .dot.warn{background:var(--warn)}.tool .dot.bad{background:var(--bad)}
+.banner .wrap{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.steps{margin:0;padding-left:20px;display:grid;gap:4px;max-width:75ch}
+.steps code,.code{font-family:var(--f-mono);font-size:.85em;background:var(--sunken);border:1px solid var(--line);border-radius:3px;padding:0 4px}
+a{color:var(--focus)}
+.badge{font-family:var(--f-mono);font-size:.72rem;background:var(--sunken);border:1px solid var(--line);color:var(--ink);border-radius:99px;padding:0 7px;line-height:1.5}
+.badge.alert{background:var(--bad);border-color:var(--bad);color:var(--surface)}
+
+.banner{padding-block:8px;font-size:.9rem}
+.banner.warn{background:var(--warn-soft);color:var(--warn)}
+.banner.bad{background:var(--bad-soft);color:var(--bad)}
+.banner.info{background:var(--info-soft)}
+
+main{padding-block:20px 60px}
+.view{display:grid;gap:18px}
+.view[hidden]{display:none!important}
+
+/* stats */
+.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.stat{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px}
+.stat b{display:block;font-family:var(--f-display);font-size:1.6rem;line-height:1.1;font-variant-numeric:tabular-nums}
+.stat span{font-size:.78rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+.stat.alert b{color:var(--bad)}
+@media (max-width:700px){.stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+/* panels and forms */
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px;min-width:0}
+.panel-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+.split{display:grid;grid-template-columns:320px minmax(0,1fr);gap:18px;align-items:start}
+.split.loans{grid-template-columns:minmax(0,1fr) minmax(0,460px)}
+@media (max-width:980px){.split,.split.loans{grid-template-columns:minmax(0,1fr)}}
+.form{display:grid;gap:12px}
+.field{display:grid;gap:4px;min-width:0}
+.field label{font-size:.78rem;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+.field .hint{font-size:.78rem;color:var(--muted)}
+input[type=text],input[type=number],input[type=date],input[type=email],input[type=search],select,textarea{width:100%;min-width:0;background:var(--bg);border:1px solid var(--line);border-radius:var(--r);padding:8px 10px}
+textarea{resize:vertical;min-height:60px}
+input:focus,select:focus,textarea:focus{border-color:var(--focus);outline:none;box-shadow:0 0 0 2px color-mix(in srgb,var(--focus) 25%,transparent)}
+.row2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.row3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+@media (max-width:600px){.row2,.row3{grid-template-columns:minmax(0,1fr)}}
+.actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:var(--r);padding:8px 14px;cursor:pointer;font-weight:600;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.btn:hover{background:var(--sunken)}
+.btn.primary{background:var(--ink);border-color:var(--ink);color:var(--bg)}
+.btn.primary:hover{opacity:.88}
+.btn.accent{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.accent:hover{filter:brightness(.95)}
+.btn.danger{color:var(--bad);border-color:color-mix(in srgb,var(--bad) 40%,var(--line))}
+.btn.danger.solid{background:var(--bad);color:var(--surface);border-color:var(--bad)}
+.btn.small{padding:4px 9px;font-size:.85rem}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.icon{border:1px solid var(--line);background:var(--surface);border-radius:var(--r);width:28px;height:28px;cursor:pointer;font-weight:700;line-height:1;display:inline-grid;place-items:center}
+.icon:hover{background:var(--sunken)}
+.icon:disabled{opacity:.4;cursor:not-allowed}
+
+/* tables */
+.table-wrap{overflow-x:auto;margin-inline:-4px}
+table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+th{font-size:.74rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);text-align:left;font-weight:600;padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:middle}
+tr:last-child td{border-bottom:0}
+td.num,th.num{text-align:right}
+td.ctr,th.ctr{text-align:center}
+.dev-name{font-weight:600}
+.dev-cat{font-size:.8rem;color:var(--muted)}
+.serial{font-family:var(--f-mono);font-size:.82rem;background:var(--sunken);border:1px solid var(--line);border-radius:3px;padding:1px 6px;white-space:nowrap}
+.stepper{display:inline-flex;align-items:center;gap:4px}
+.stepper input{width:64px;text-align:center;padding:4px 6px;font-family:var(--f-mono)}
+tr.clickable{cursor:pointer}
+tr.clickable:hover td{background:var(--sunken)}
+tr.selected td{background:color-mix(in srgb,var(--accent) 16%,transparent)}
+tr.confirm td{background:var(--bad-soft)}
+
+.chip{display:inline-block;font-size:.74rem;font-weight:600;padding:2px 8px;border-radius:99px;white-space:nowrap;text-transform:uppercase;letter-spacing:.04em}
+.chip.ok{background:var(--ok-soft);color:var(--ok)}
+.chip.warn{background:var(--warn-soft);color:var(--warn)}
+.chip.bad{background:var(--bad-soft);color:var(--bad)}
+.chip.info{background:var(--info-soft);color:var(--ink)}
+.avail{font-family:var(--f-mono);font-weight:500}
+.avail.zero{color:var(--bad)}
+.avail.low{color:var(--warn)}
+
+.empty{border:1px dashed var(--line);border-radius:var(--r);padding:28px 18px;text-align:center;color:var(--muted);display:grid;gap:6px;justify-items:center}
+.empty strong{color:var(--ink);font-family:var(--f-display);font-size:1.05rem}
+
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:var(--r);overflow:hidden;flex-wrap:wrap}
+.seg button{border:0;background:var(--surface);padding:6px 12px;cursor:pointer;font-weight:600;color:var(--muted)}
+.seg button+button{border-left:1px solid var(--line)}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
+.toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:space-between;margin-bottom:12px}
+.toolbar input[type=search]{max-width:260px}
+
+.picker{display:grid;grid-template-columns:minmax(0,2fr) 90px minmax(0,1.2fr) auto;gap:10px;align-items:end;background:var(--sunken);border-radius:var(--r);padding:12px}
+@media (max-width:720px){.picker{grid-template-columns:minmax(0,1fr) 90px}.picker .field:nth-child(3){grid-column:1/-1}.picker .btn{grid-column:1/-1;justify-content:center}}
+.sheet-note{font-size:.82rem;color:var(--muted)}
+
+.saved{border:1px solid color-mix(in srgb,var(--ok) 45%,var(--line));background:var(--ok-soft);border-radius:var(--r);padding:14px 16px;display:grid;gap:10px}
+.saved p{margin:0}
+
+.detail{position:sticky;top:76px}
+@media (max-width:980px){.detail{position:static}}
+.dl{display:grid;grid-template-columns:auto minmax(0,1fr);gap:4px 14px;margin:0}
+.dl dt{font-size:.74rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);padding-top:2px}
+.dl dd{margin:0;overflow-wrap:anywhere}
+.ret-input{width:62px;text-align:center;padding:4px 6px;font-family:var(--f-mono)}
+.ret-row.done td{color:var(--ok)}
+.ret-row.miss td:first-child{box-shadow:inset 3px 0 0 var(--warn)}
+.divider{border:0;border-top:1px solid var(--line);margin:14px 0}
+
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(18px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:var(--r);box-shadow:0 6px 24px rgba(0,0,0,.25);z-index:20;max-width:calc(100% - 32px);font-weight:500}
+.toast.bad{background:var(--bad);color:#fff}
+@media (prefers-reduced-motion:no-preference){.toast{animation:pop .18s ease-out}@keyframes pop{from{opacity:0;transform:translate(-50%,8px)}}}
+</style>
+
+<header class="top">
+  <div class="wrap top-in">
+    <div class="brand"><span class="tag">ICT·LAB</span><h1>Loan Desk</h1></div>
+    <nav class="tabs" role="tablist" aria-label="Sections">
+      <button id="tab-inventory" role="tab" data-view="inventory" aria-selected="true">Inventory</button>
+      <button id="tab-new" role="tab" data-view="new" aria-selected="false">New loan</button>
+      <button id="tab-loans" role="tab" data-view="loans" aria-selected="false">Loans <span id="loanBadge" class="badge" hidden></span></button>
+    </nav>
+    <div class="tools">
+      <button class="tool" id="storageBtn" type="button" hidden></button>
+      <button class="tool" id="themeBtn" type="button" title="Switch between automatic, light and dark theme"></button>
+    </div>
+  </div>
+</header>
+<div id="banner" class="banner" hidden><div class="wrap" id="bannerText"></div></div>
+
+<main class="wrap">
+  <!-- GITHUB STORAGE SETTINGS (only outside the Claude viewer) -->
+  <section id="ghPanel" class="panel" hidden style="margin-bottom:18px">
+    <div class="panel-head"><h2>Save data to a private GitHub repository</h2><button class="btn small" type="button" id="ghClose">Close</button></div>
+    <ol class="steps">
+      <li>On GitHub, create a <b>private</b> repository for the data, for example <span class="code">ict-lab-loan-data</span>. It can be empty.</li>
+      <li>Create a <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">fine-grained access token</a>: choose “Only select repositories” and pick that data repository, then under Repository permissions set <b>Contents</b> to “Read and write”.</li>
+      <li>Paste the token below and press Connect. The token stays in this browser only; repeat this on each computer you use.</li>
+    </ol>
+    <form class="form" id="ghForm" autocomplete="off" style="margin-top:14px">
+      <div class="row2">
+        <div class="field"><label for="ghOwner">GitHub account</label><input type="text" id="ghOwner" required value="SakibKhan-Karelia"></div>
+        <div class="field"><label for="ghRepo">Data repository</label><input type="text" id="ghRepo" required value="ict-lab-loan-data"></div>
+      </div>
+      <div class="row2">
+        <div class="field"><label for="ghBranch">Branch</label><input type="text" id="ghBranch" required value="main"></div>
+        <div class="field"><label for="ghPath">Data file</label><input type="text" id="ghPath" required value="data.json"></div>
+      </div>
+      <div class="field"><label for="ghToken">Access token</label><input type="password" id="ghToken" placeholder="github_pat_…" autocomplete="off"><span class="hint" id="ghTokenHint">Never share this token or put it in the public website repository.</span></div>
+      <div class="actions">
+        <button type="submit" class="btn primary" id="ghConnect">Connect</button>
+        <button type="button" class="btn danger" id="ghDisconnect" hidden>Disconnect this browser</button>
+        <span class="sheet-note" id="ghMsg"></span>
+      </div>
+    </form>
+  </section>
+
+  <!-- INVENTORY -->
+  <section id="view-inventory" class="view" role="tabpanel" aria-labelledby="tab-inventory">
+    <div class="stats" id="stats"></div>
+    <div class="split">
+      <form class="panel form" id="invForm" autocomplete="off">
+        <h2 id="invFormTitle">Add device</h2>
+        <div class="field"><label for="invName">Device / component name</label><input type="text" id="invName" required placeholder="e.g. Raspberry Pi 4 Model B"></div>
+        <div class="field"><label for="invCat">Category</label><input type="text" id="invCat" list="catList" placeholder="e.g. Microcontrollers"><datalist id="catList"></datalist></div>
+        <div class="field"><label for="invSerial">Serial / asset number</label><input type="text" id="invSerial" placeholder="Optional"><span class="hint">Pre-fills the serial number when you lend it.</span></div>
+        <div class="field"><label for="invTotal">Amount in stock</label><input type="number" id="invTotal" min="0" step="1" value="1" required></div>
+        <div class="field"><label for="invNotes">Notes</label><textarea id="invNotes" rows="2" placeholder="Shelf, condition, accessories…"></textarea></div>
+        <div class="actions">
+          <button type="submit" class="btn primary" id="invSubmit">Add to inventory</button>
+          <button type="button" class="btn" id="invCancel" hidden>Cancel</button>
+        </div>
+      </form>
+      <div class="panel">
+        <div class="toolbar">
+          <h2>Equipment</h2>
+          <div class="actions">
+            <input type="search" id="invSearch" placeholder="Search devices" aria-label="Search devices">
+            <button class="btn small" id="invExport" type="button">Export to Excel</button>
+          </div>
+        </div>
+        <div id="invTable"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- NEW LOAN -->
+  <section id="view-new" class="view" role="tabpanel" aria-labelledby="tab-new" hidden>
+    <div id="savedBox"></div>
+    <form class="panel form" id="loanForm" autocomplete="off">
+      <div class="panel-head"><h2>New loan record</h2><span class="sheet-note">Fields follow the paper “ICT Laboratory Equipment Loan Record”.</span></div>
+      <div class="field"><label for="lnNames">Name(s)</label><input type="text" id="lnNames" required placeholder="Borrower name(s), separated by commas"></div>
+      <div class="row2">
+        <div class="field"><label for="lnGroup">Group</label><input type="text" id="lnGroup" placeholder="e.g. TTV23S1"></div>
+        <div class="field"><label for="lnCourse">Course</label><input type="text" id="lnCourse" placeholder="Course or project"></div>
+      </div>
+      <div class="row3">
+        <div class="field"><label for="lnStart">Start date</label><input type="date" id="lnStart" required></div>
+        <div class="field"><label for="lnEnd">End date (return by)</label><input type="date" id="lnEnd" required></div>
+        <div class="field"><label for="lnContact">Contact (email / phone)</label><input type="text" id="lnContact" placeholder="Optional, not printed"></div>
+      </div>
+      <div class="field"><label for="lnNotes">Notes</label><textarea id="lnNotes" rows="2" placeholder="Optional, not printed"></textarea></div>
+
+      <hr class="divider">
+      <h3>Equipment</h3>
+      <div class="picker">
+        <div class="field"><label for="pkItem">Device</label><select id="pkItem"></select></div>
+        <div class="field"><label for="pkQty">Number</label><input type="number" id="pkQty" min="1" step="1" value="1"></div>
+        <div class="field"><label for="pkSerial">Serial number</label><input type="text" id="pkSerial" placeholder="Optional"></div>
+        <button type="button" class="btn accent" id="pkAdd">Add to loan</button>
+      </div>
+      <div id="draftTable"></div>
+      <div class="actions">
+        <button type="submit" class="btn primary" id="lnSave">Save loan</button>
+        <button type="button" class="btn" id="lnClear">Clear form</button>
+      </div>
+    </form>
+  </section>
+
+  <!-- LOANS -->
+  <section id="view-loans" class="view" role="tabpanel" aria-labelledby="tab-loans" hidden>
+    <div class="split loans">
+      <div class="panel">
+        <div class="toolbar">
+          <div class="seg" id="loanFilter" role="group" aria-label="Filter loans">
+            <button type="button" data-f="open" aria-pressed="true">Out now</button>
+            <button type="button" data-f="overdue" aria-pressed="false">Overdue</button>
+            <button type="button" data-f="returned" aria-pressed="false">Returned</button>
+            <button type="button" data-f="all" aria-pressed="false">All</button>
+          </div>
+          <input type="search" id="loanSearch" placeholder="Search name, group, course, device" aria-label="Search loans">
+        </div>
+        <div id="loanTable"></div>
+      </div>
+      <aside class="panel detail" id="loanDetail" aria-live="polite"></aside>
+    </div>
+  </section>
+</main>
+<div id="toast" class="toast" role="status" hidden></div>
+
+<script>
+/* ---------- helpers ---------- */
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const todayISO = () => { const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0,10); };
+const addDays = (iso, n) => { const d = new Date(iso + 'T12:00:00'); d.setDate(d.getDate() + n); return d.toISOString().slice(0,10); };
+const fmtDate = iso => { if (!iso) return ''; const [y,m,d] = iso.split('-'); return `${+d}.${+m}.${y}`; };
+const uid = () => (crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2, 10));
+const int = v => { const n = parseInt(v, 10); return Number.isFinite(n) ? n : 0; };
+const safeFile = s => String(s || '').replace(/[\\/:*?"<>|]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 60) || 'loan';
+
+let toastTimer;
+function toast(msg, kind) {
+  const t = $('#toast'); t.textContent = msg; t.className = 'toast' + (kind ? ' ' + kind : ''); t.hidden = false;
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.hidden = true, 3200);
+}
+function banner(msg, kind, action) {
+  const b = $('#banner'); if (!msg) { b.hidden = true; return; }
+  b.className = 'banner ' + (kind || 'info');
+  $('#bannerText').innerHTML = `<span>${esc(msg)}</span>` + (action ? `<button class="btn small" type="button" id="bannerAct">${esc(action.label)}</button>` : '');
+  if (action) $('#bannerAct').onclick = action.run;
+  b.hidden = false;
+}
+
+/* ---------- theme ---------- */
+const THEME_KEY = 'ict-lab-loan-desk-theme';
+const hostTheme = document.documentElement.getAttribute('data-theme');
+let themePref = 'auto';
+try { themePref = localStorage.getItem(THEME_KEY) || 'auto'; } catch (e) {}
+function applyTheme() {
+  const root = document.documentElement;
+  if (themePref === 'light' || themePref === 'dark') root.setAttribute('data-theme', themePref);
+  else if (hostTheme) root.setAttribute('data-theme', hostTheme);
+  else root.removeAttribute('data-theme');
+  const label = { auto: ['◐', 'Auto'], light: ['☀', 'Light'], dark: ['☾', 'Dark'] }[themePref];
+  const btn = $('#themeBtn');
+  btn.innerHTML = `<span aria-hidden="true">${label[0]}</span> ${label[1]}`;
+  btn.setAttribute('aria-label', `Theme: ${label[1]}. Click to change.`);
+}
+$('#themeBtn').addEventListener('click', () => {
+  themePref = { auto: 'light', light: 'dark', dark: 'auto' }[themePref] || 'auto';
+  try { localStorage.setItem(THEME_KEY, themePref); } catch (e) {}
+  applyTheme();
+});
+applyTheme();
+
+/* ---------- storage ---------- */
+const S = {
+  inv: new Map(), loans: new Map(), mode: 'starting', db: null, ready: false,
+  view: 'inventory', invQuery: '', editingId: null, pendingDel: null,
+  draft: [], lastSaved: null,
+  loanFilter: 'open', loanQuery: '', openLoan: null, retDraft: null, pendingLoanDel: false,
+};
+const LS_KEY = 'ict-lab-loan-desk-v1';
+function loadLocal() {
+  try {
+    const j = JSON.parse(localStorage.getItem(LS_KEY) || '{}');
+    S.inv = new Map(Object.entries(j.inventory || {}).map(([k, v]) => [k, { ...v, id: k }]));
+    S.loans = new Map(Object.entries(j.loans || {}).map(([k, v]) => [k, { ...v, id: k }]));
+  } catch (e) {}
+}
+function saveLocal() {
+  try {
+    const strip = m => Object.fromEntries([...m].map(([k, v]) => { const o = { ...v }; delete o.id; return [k, o]; }));
+    localStorage.setItem(LS_KEY, JSON.stringify({ inventory: strip(S.inv), loans: strip(S.loans) }));
+  } catch (e) {}
+}
+function writeErr(e) {
+  if (!e || !e.code) return 'Could not save. Check your connection and try again.';
+  if (e.code === 'quota_exceeded') return 'Storage is full. Delete old returned loans to free space.';
+  if (e.code === 'invalid_argument') return 'You do not have permission to change this data.';
+  return 'Could not save (' + e.code + '). Try again in a moment.';
+}
+/* ---------- GitHub storage (used outside the Claude viewer, e.g. on GitHub Pages) ---------- */
+const GH_KEY = 'ict-lab-loan-desk-github';
+const GH = { cfg: null, sha: null, remote: { inventory: {}, loans: {} }, ops: new Map(), msgs: [], timer: null, saving: false, again: false, state: 'idle', lastPull: 0 };
+function ghLoadCfg() { try { return JSON.parse(localStorage.getItem(GH_KEY) || 'null'); } catch (e) { return null; } }
+function ghSaveCfg(c) { try { c ? localStorage.setItem(GH_KEY, JSON.stringify(c)) : localStorage.removeItem(GH_KEY); } catch (e) {} }
+const b64enc = s => { const b = new TextEncoder().encode(s); let bin = ''; for (let i = 0; i < b.length; i += 0x8000) bin += String.fromCharCode.apply(null, b.subarray(i, i + 0x8000)); return btoa(bin); };
+const b64dec = s => new TextDecoder().decode(Uint8Array.from(atob(String(s).replace(/\s/g, '')), c => c.charCodeAt(0)));
+function ghHeaders() { return { Authorization: 'Bearer ' + GH.cfg.token, Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' }; }
+const ghRepoUrl = () => `https://api.github.com/repos/${encodeURIComponent(GH.cfg.owner)}/${encodeURIComponent(GH.cfg.repo)}`;
+const ghFileUrl = () => ghRepoUrl() + '/contents/' + GH.cfg.path.split('/').map(encodeURIComponent).join('/');
+class GhError extends Error { constructor(kind, msg) { super(msg); this.kind = kind; } }
+function ghExplain(e) {
+  const kind = e && e.kind;
+  if (kind === 'auth') return 'GitHub refused the token. Check that it is not expired and has Contents “Read and write” access to the data repository.';
+  if (kind === 'repo') return `Repository ${GH.cfg.owner}/${GH.cfg.repo} was not found, or the token cannot see it.`;
+  if (kind === 'net') return 'Could not reach GitHub. Check your internet connection.';
+  return 'GitHub returned an error' + (e && e.message ? ` (${e.message})` : '') + '.';
+}
+async function ghFetch(url, opts = {}) {
+  try { return await fetch(url, { cache: 'no-store', ...opts, headers: { ...ghHeaders(), ...(opts.headers || {}) } }); }
+  catch (e) { throw new GhError('net', e.message); }
+}
+function normalizeData(j) { return { inventory: (j && j.inventory) || {}, loans: (j && j.loans) || {} }; }
+async function ghPull() {
+  const r = await ghFetch(ghFileUrl() + '?ref=' + encodeURIComponent(GH.cfg.branch));
+  if (r.status === 401) throw new GhError('auth');
+  if (r.status === 404) {
+    const rr = await ghFetch(ghRepoUrl());
+    if (rr.status === 401) throw new GhError('auth');
+    if (!rr.ok) throw new GhError('repo');
+    GH.sha = null; GH.remote = normalizeData(null); GH.lastPull = Date.now(); return;
+  }
+  if (r.status === 403) throw new GhError('auth');
+  if (!r.ok) throw new GhError('http', 'HTTP ' + r.status);
+  const j = await r.json();
+  let text = j.content ? b64dec(j.content) : '';
+  if (!text && j.sha && j.size) { // files over 1 MB come without inline content
+    const br = await ghFetch(ghRepoUrl() + '/git/blobs/' + j.sha);
+    if (!br.ok) throw new GhError('http', 'HTTP ' + br.status);
+    text = b64dec((await br.json()).content);
+  }
+  GH.sha = j.sha;
+  try { GH.remote = normalizeData(text ? JSON.parse(text) : null); }
+  catch (e) { throw new GhError('http', 'the data file is not valid JSON'); }
+  GH.lastPull = Date.now();
+}
+function ghApply(base, ops) {
+  const next = { inventory: { ...base.inventory }, loans: { ...base.loans } };
+  for (const [k, v] of ops) { const [col, id] = k.split('/'); if (v === null) delete next[col][id]; else next[col][id] = v; }
+  return next;
+}
+function ghView() {
+  const d = ghApply(GH.remote, GH.ops);
+  S.inv = new Map(Object.entries(d.inventory).map(([k, v]) => [k, { ...v, id: k }]));
+  S.loans = new Map(Object.entries(d.loans).map(([k, v]) => [k, { ...v, id: k }]));
+}
+function ghDescribe(col, id, body) {
+  if (body === null) { const old = (col === 'inventory' ? S.inv : S.loans).get(id); return `Delete ${col === 'inventory' ? 'device' : 'loan'} ${old ? (old.name || old.names || id) : id}`; }
+  return col === 'inventory' ? `Inventory: ${body.name}` : `Loan ${body.ref || ''}: ${body.names}${body.status === 'returned' ? ' (returned)' : ''}`;
+}
+function ghQueue(col, id, body) {
+  GH.msgs.push(ghDescribe(col, id, body));
+  GH.ops.set(col + '/' + id, body);
+  ghView(); renderAll();
+  setSync('pending');
+  clearTimeout(GH.timer); GH.timer = setTimeout(ghSave, 900);
+  return Promise.resolve(true);
+}
+async function ghSave() {
+  if (GH.saving) { GH.again = true; return; }
+  if (!GH.ops.size) return;
+  GH.saving = true; setSync('saving');
+  const ops = new Map(GH.ops), nMsgs = GH.msgs.length;
+  const message = GH.msgs[0] + (nMsgs > 1 ? ` (+${nMsgs - 1} more change${nMsgs > 2 ? 's' : ''})` : '');
+  try {
+    let done = false;
+    for (let attempt = 0; attempt < 3 && !done; attempt++) {
+      const next = ghApply(GH.remote, ops);
+      const body = { message, content: b64enc(JSON.stringify(next, null, 1)), branch: GH.cfg.branch };
+      if (GH.sha) body.sha = GH.sha;
+      let r = await ghFetch(ghFileUrl(), { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      if (!r.ok && !GH.sha && (r.status === 404 || r.status === 422)) { // empty repository: let GitHub create the default branch
+        delete body.branch;
+        r = await ghFetch(ghFileUrl(), { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      }
+      if (r.ok) {
+        const j = await r.json();
+        GH.sha = j.content.sha; GH.remote = next; GH.lastPull = Date.now();
+        for (const [k, v] of ops) if (GH.ops.get(k) === v) GH.ops.delete(k);
+        GH.msgs = GH.msgs.slice(nMsgs);
+        done = true; break;
+      }
+      if (r.status === 401 || r.status === 403) throw new GhError('auth');
+      if (r.status === 409 || r.status === 422) { await ghPull(); continue; } // someone else saved first: merge onto the latest file
+      throw new GhError('http', 'HTTP ' + r.status);
+    }
+    if (!done) throw new GhError('http', 'the file kept changing while saving');
+    ghView(); renderAll();
+    setSync(GH.ops.size ? 'pending' : 'saved');
+  } catch (e) {
+    setSync('error'); toast('Not saved to GitHub. ' + ghExplain(e), 'bad');
+  } finally {
+    GH.saving = false;
+    if (GH.again || GH.ops.size && GH.state !== 'error') { GH.again = false; clearTimeout(GH.timer); GH.timer = setTimeout(ghSave, 400); }
+  }
+}
+function setSync(state) {
+  GH.state = state;
+  const b = $('#storageBtn');
+  if (S.mode === 'db') { b.hidden = true; return; }
+  b.hidden = false;
+  const map = {
+    local: ['warn', 'This browser only'], saved: ['ok', 'Saved to GitHub'], pending: ['warn', 'Unsaved changes'],
+    saving: ['warn', 'Saving…'], error: ['bad', 'Not saved · retry'], loading: ['warn', 'Loading…'], idle: ['ok', 'GitHub']
+  };
+  const [cls, text] = map[state] || map.idle;
+  b.innerHTML = `<span class="dot ${cls}" aria-hidden="true"></span>${text}`;
+  b.title = S.mode === 'github' ? `Data file: ${GH.cfg.owner}/${GH.cfg.repo}/${GH.cfg.path}` : 'Set up GitHub storage';
+}
+$('#storageBtn').addEventListener('click', () => {
+  if (S.mode === 'github' && GH.state === 'error') { ghSave(); return; }
+  openGhPanel();
+});
+function openGhPanel() {
+  const c = GH.cfg || ghLoadCfg();
+  if (c) { $('#ghOwner').value = c.owner; $('#ghRepo').value = c.repo; $('#ghBranch').value = c.branch; $('#ghPath').value = c.path; }
+  $('#ghToken').value = '';
+  $('#ghToken').placeholder = c ? 'Saved in this browser. Paste a new token to replace it.' : 'github_pat_…';
+  $('#ghDisconnect').hidden = S.mode !== 'github';
+  $('#ghMsg').textContent = S.mode === 'github' ? `Connected to ${GH.cfg.owner}/${GH.cfg.repo}.` : '';
+  $('#ghPanel').hidden = false;
+  $('#ghPanel').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+$('#ghClose').addEventListener('click', () => { $('#ghPanel').hidden = true; });
+$('#ghForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const prev = GH.cfg || ghLoadCfg();
+  const cfg = { owner: $('#ghOwner').value.trim(), repo: $('#ghRepo').value.trim(), branch: $('#ghBranch').value.trim() || 'main',
+    path: $('#ghPath').value.trim().replace(/^\/+/, '') || 'data.json', token: $('#ghToken').value.trim() || (prev && prev.token) || '' };
+  if (!cfg.token) { $('#ghMsg').textContent = 'Paste your access token first.'; return; }
+  $('#ghConnect').disabled = true; $('#ghMsg').textContent = 'Connecting…';
+  const wasLocal = S.mode !== 'github';
+  const localInv = new Map(S.inv), localLoans = new Map(S.loans);
+  GH.cfg = cfg; GH.ops = new Map(); GH.msgs = [];
+  try {
+    await ghPull();
+    ghSaveCfg(cfg);
+    S.mode = 'github'; S.ready = true;
+    // First connection with an empty data file: move what this browser already has into GitHub.
+    const remoteEmpty = !Object.keys(GH.remote.inventory).length && !Object.keys(GH.remote.loans).length;
+    if (wasLocal && remoteEmpty && (localInv.size || localLoans.size)) {
+      for (const [id, v] of localInv) { const o = { ...v }; delete o.id; GH.ops.set('inventory/' + id, o); }
+      for (const [id, v] of localLoans) { const o = { ...v }; delete o.id; GH.ops.set('loans/' + id, o); }
+      GH.msgs.push('Import data from browser');
+    }
+    ghView(); renderAll(); banner(null); setSync(GH.ops.size ? 'pending' : 'saved');
+    if (GH.ops.size) ghSave();
+    $('#ghPanel').hidden = true;
+    toast(`Connected to ${cfg.owner}/${cfg.repo}`);
+  } catch (err) {
+    GH.cfg = prev && S.mode === 'github' ? prev : null;
+    $('#ghMsg').textContent = ghExplain(err);
+  } finally { $('#ghConnect').disabled = false; }
+});
+$('#ghDisconnect').addEventListener('click', () => {
+  if (GH.ops.size) { $('#ghMsg').textContent = 'Wait until all changes are saved, then disconnect.'; return; }
+  ghSaveCfg(null); GH.cfg = null; $('#ghPanel').hidden = true;
+  goLocal();
+  toast('Disconnected. The token was removed from this browser.');
+});
+window.addEventListener('beforeunload', e => { if (S.mode === 'github' && (GH.ops.size || GH.saving)) { e.preventDefault(); e.returnValue = ''; } });
+async function ghRefresh() {
+  if (S.mode !== 'github' || GH.ops.size || GH.saving || Date.now() - GH.lastPull < 15000) return;
+  try { await ghPull(); ghView(); renderAll(); if (GH.state === 'error') setSync('saved'); } catch (e) {}
+}
+window.addEventListener('focus', ghRefresh);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) ghRefresh(); });
+
+const chains = {};
+function writeDoc(col, id, data) {
+  const map = col === 'inventory' ? S.inv : S.loans;
+  const body = { ...data }; delete body.id;
+  if (S.mode === 'github') return ghQueue(col, id, body);
+  if (S.mode !== 'db') { map.set(id, { ...body, id }); saveLocal(); renderAll(); return Promise.resolve(true); }
+  const key = col + '/' + id;
+  const p = (chains[key] || Promise.resolve()).catch(() => {}).then(() => S.db.collection(col).doc(id).set(body));
+  chains[key] = p;
+  return p.then(() => true, e => { toast(writeErr(e), 'bad'); return false; });
+}
+function deleteDoc(col, id) {
+  const map = col === 'inventory' ? S.inv : S.loans;
+  if (S.mode === 'github') return ghQueue(col, id, null);
+  if (S.mode !== 'db') { map.delete(id); saveLocal(); renderAll(); return Promise.resolve(true); }
+  const key = col + '/' + id;
+  const p = (chains[key] || Promise.resolve()).catch(() => {}).then(() => S.db.collection(col).doc(id).delete());
+  chains[key] = p;
+  return p.then(() => true, e => { toast(writeErr(e), 'bad'); return false; });
+}
+function goLocal(msg) {
+  S.mode = 'local'; loadLocal(); S.ready = true;
+  banner(msg || 'Data is saved in this browser only. Connect a private GitHub repository to keep it safe and use it on other computers.', 'warn',
+    { label: 'Set up GitHub storage', run: openGhPanel });
+  setSync('local'); renderAll();
+}
+async function startStorage() {
+  let tries = 0;
+  while (!(window.claude && window.claude.use) && tries < 15) { await new Promise(r => setTimeout(r, 100)); tries++; }
+  if (!(window.claude && window.claude.use)) {
+    const cfg = ghLoadCfg();
+    if (!cfg) { goLocal(); return; }
+    GH.cfg = cfg; S.mode = 'github'; setSync('loading'); renderAll();
+    try { await ghPull(); ghView(); S.ready = true; setSync('saved'); renderAll(); }
+    catch (e) {
+      S.ready = true; setSync('error'); renderAll();
+      banner('Could not load data from GitHub. ' + ghExplain(e), 'bad', { label: 'Check settings', run: openGhPanel });
+    }
+    return;
+  }
+  let db = null;
+  try { db = await window.claude.use('db'); } catch (e) {}
+  if (!db) { S.mode = 'local'; loadLocal(); S.ready = true; banner('Shared storage is not available in this view (sign in to claude.ai to use it). Changes are saved in this browser only.', 'warn'); renderAll(); return; }
+  S.db = db; S.mode = 'db';
+  let gotInv = false, gotLoans = false, failed = false;
+  const timer = setTimeout(() => { if (!(gotInv && gotLoans) && !failed) banner('Still connecting to storage. What you see may be out of date.', 'warn'); }, 10000);
+  const settle = () => { if (gotInv && gotLoans) { clearTimeout(timer); if (!failed) banner(null); S.ready = true; } renderAll(); };
+  const fail = what => e => { failed = true; clearTimeout(timer); S.ready = true; banner(`Could not load ${what} (${e.code}). Reload the page to try again.`, 'bad'); renderAll(); };
+  db.collection('inventory').onSnapshot(snap => {
+    S.inv = new Map(snap.docs.map(d => [d.id, { ...d.data(), id: d.id }]));
+    if (!snap.metadata.fromCache) gotInv = true; settle();
+  }, fail('inventory'));
+  db.collection('loans').onSnapshot(snap => {
+    S.loans = new Map(snap.docs.map(d => [d.id, { ...d.data(), id: d.id }]));
+    if (!snap.metadata.fromCache) gotLoans = true; settle();
+  }, fail('loans'));
+}
+
+/* ---------- derived ---------- */
+const outstandingOf = it => Math.max(0, (it.qty || 0) - (it.returnedQty || 0));
+function onLoanMap() {
+  const m = {};
+  for (const l of S.loans.values()) {
+    if (l.status === 'returned') continue;
+    for (const it of l.items || []) m[it.itemId] = (m[it.itemId] || 0) + outstandingOf(it);
+  }
+  return m;
+}
+function loanState(l) {
+  if (l.status === 'returned') return 'returned';
+  if (l.endDate && l.endDate < todayISO()) return 'overdue';
+  return (l.items || []).some(i => (i.returnedQty || 0) > 0) ? 'partial' : 'out';
+}
+const STATE_CHIP = { returned: ['ok', 'Returned'], overdue: ['bad', 'Overdue'], partial: ['warn', 'Partly back'], out: ['info', 'Out'] };
+const chip = st => `<span class="chip ${STATE_CHIP[st][0]}">${STATE_CHIP[st][1]}</span>`;
+const sortedInv = () => [...S.inv.values()].sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base' }));
+
+/* ---------- views / tabs ---------- */
+function setView(v, push = true) {
+  if (!['inventory', 'new', 'loans'].includes(v)) v = 'inventory';
+  S.view = v;
+  for (const b of document.querySelectorAll('.tabs button')) b.setAttribute('aria-selected', String(b.dataset.view === v));
+  for (const s of ['inventory', 'new', 'loans']) $('#view-' + s).hidden = s !== v;
+  if (push) try { history.replaceState(null, '', '#' + v); } catch (e) {}
+}
+document.querySelector('.tabs').addEventListener('click', e => { const b = e.target.closest('button[data-view]'); if (b) setView(b.dataset.view); });
+
+/* ---------- render ---------- */
+function renderAll() { renderStats(); renderInventory(); renderPicker(); renderDraft(); renderSaved(); renderLoans(); renderDetail(); renderBadge(); }
+
+function renderStats() {
+  const onLoan = onLoanMap();
+  let units = 0, out = 0;
+  for (const it of S.inv.values()) units += it.total || 0;
+  for (const v of Object.values(onLoan)) out += v;
+  const open = [...S.loans.values()].filter(l => l.status !== 'returned');
+  const overdue = open.filter(l => loanState(l) === 'overdue').length;
+  $('#stats').innerHTML = `
+    <div class="stat"><b>${S.inv.size}</b><span>Device types</span></div>
+    <div class="stat"><b>${units}</b><span>Units in stock</span></div>
+    <div class="stat"><b>${out}</b><span>Units on loan</span></div>
+    <div class="stat ${overdue ? 'alert' : ''}"><b>${overdue}</b><span>Overdue loans</span></div>`;
+  const cats = [...new Set([...S.inv.values()].map(i => i.category).filter(Boolean))].sort();
+  $('#catList').innerHTML = cats.map(c => `<option value="${esc(c)}">`).join('');
+}
+
+function renderInventory() {
+  const box = $('#invTable');
+  if (!S.ready) { box.innerHTML = `<div class="empty"><strong>Loading inventory…</strong></div>`; return; }
+  if (!S.inv.size) {
+    box.innerHTML = `<div class="empty"><strong>No equipment yet</strong><span>Add your first device with the form. Each device keeps its stock amount, and the page tracks how many are out on loan.</span></div>`;
+    return;
+  }
+  const q = S.invQuery.trim().toLowerCase();
+  const onLoan = onLoanMap();
+  const rows = sortedInv().filter(i => !q || [i.name, i.category, i.serial, i.notes].some(x => (x || '').toLowerCase().includes(q)));
+  if (!rows.length) { box.innerHTML = `<div class="empty"><strong>No match</strong><span>Nothing in the inventory matches “${esc(S.invQuery)}”.</span></div>`; return; }
+  box.innerHTML = `<div class="table-wrap"><table>
+    <thead><tr><th>Device</th><th>Serial / asset</th><th class="ctr">In stock</th><th class="num">On loan</th><th class="num">Available</th><th></th></tr></thead>
+    <tbody>${rows.map(i => {
+      const ol = onLoan[i.id] || 0, av = (i.total || 0) - ol;
+      if (S.pendingDel === i.id) return `<tr class="confirm"><td colspan="5"><b>Delete “${esc(i.name)}”?</b> This removes it from the inventory. Past loan records keep its name.</td>
+        <td class="num"><div class="actions" style="justify-content:flex-end"><button class="btn small danger solid" data-act="del-yes" data-id="${i.id}">Delete</button><button class="btn small" data-act="del-no">Keep</button></div></td></tr>`;
+      return `<tr>
+        <td><div class="dev-name">${esc(i.name)}</div>${i.category ? `<div class="dev-cat">${esc(i.category)}</div>` : ''}${i.notes ? `<div class="dev-cat">${esc(i.notes)}</div>` : ''}</td>
+        <td>${i.serial ? `<span class="serial">${esc(i.serial)}</span>` : '<span class="muted">–</span>'}</td>
+        <td class="ctr"><div class="stepper">
+          <button class="icon" data-act="dec" data-id="${i.id}" aria-label="One less ${esc(i.name)}" ${(i.total || 0) <= ol ? 'disabled' : ''}>−</button>
+          <input type="number" min="${ol}" step="1" value="${i.total || 0}" data-act="total" data-id="${i.id}" aria-label="Amount of ${esc(i.name)} in stock">
+          <button class="icon" data-act="inc" data-id="${i.id}" aria-label="One more ${esc(i.name)}">+</button></div></td>
+        <td class="num mono">${ol}</td>
+        <td class="num"><span class="avail ${av <= 0 ? 'zero' : av <= 1 ? 'low' : ''}">${av}</span></td>
+        <td class="num"><div class="actions" style="justify-content:flex-end;flex-wrap:nowrap">
+          <button class="btn small" data-act="edit" data-id="${i.id}">Edit</button>
+          <button class="btn small danger" data-act="del" data-id="${i.id}" ${ol ? 'disabled title="Some units are on loan"' : ''}>Delete</button></div></td>
+      </tr>`;
+    }).join('')}</tbody></table></div>`;
+}
+
+function setTotal(id, total) {
+  const it = S.inv.get(id); if (!it) return;
+  const ol = onLoanMap()[id] || 0;
+  total = Math.max(0, int(total));
+  if (total < ol) { toast(`${ol} unit(s) of ${it.name} are on loan, so stock can't go below ${ol}.`, 'bad'); total = ol; }
+  if (total === it.total) { renderInventory(); return; }
+  it.total = total; renderAll();
+  writeDoc('inventory', id, { ...it, total, updatedAt: new Date().toISOString() });
+}
+$('#invTable').addEventListener('click', e => {
+  const b = e.target.closest('button[data-act]'); if (!b) return;
+  const id = b.dataset.id, it = S.inv.get(id);
+  switch (b.dataset.act) {
+    case 'inc': setTotal(id, (it.total || 0) + 1); break;
+    case 'dec': setTotal(id, (it.total || 0) - 1); break;
+    case 'edit': startEdit(id); break;
+    case 'del': S.pendingDel = id; renderInventory(); break;
+    case 'del-no': S.pendingDel = null; renderInventory(); break;
+    case 'del-yes': S.pendingDel = null; deleteDoc('inventory', id).then(ok => ok && toast('Device deleted')); if (S.editingId === id) resetInvForm(); break;
+  }
+});
+$('#invTable').addEventListener('change', e => { const i = e.target.closest('input[data-act="total"]'); if (i) setTotal(i.dataset.id, i.value); });
+$('#invSearch').addEventListener('input', e => { S.invQuery = e.target.value; renderInventory(); });
+
+function startEdit(id) {
+  const it = S.inv.get(id); if (!it) return;
+  S.editingId = id;
+  $('#invFormTitle').textContent = 'Edit device';
+  $('#invName').value = it.name || ''; $('#invCat').value = it.category || ''; $('#invSerial').value = it.serial || '';
+  $('#invTotal').value = it.total || 0; $('#invNotes').value = it.notes || '';
+  $('#invSubmit').textContent = 'Save changes'; $('#invCancel').hidden = false;
+  $('#invForm').scrollIntoView({ behavior: 'smooth', block: 'start' }); $('#invName').focus({ preventScroll: true });
+}
+function resetInvForm() {
+  S.editingId = null; $('#invForm').reset(); $('#invTotal').value = 1;
+  $('#invFormTitle').textContent = 'Add device'; $('#invSubmit').textContent = 'Add to inventory'; $('#invCancel').hidden = true;
+}
+$('#invCancel').addEventListener('click', resetInvForm);
+$('#invForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const name = $('#invName').value.trim();
+  if (!name) { toast('Give the device a name.', 'bad'); return; }
+  const total = Math.max(0, int($('#invTotal').value));
+  const dup = [...S.inv.values()].find(i => i.id !== S.editingId && (i.name || '').trim().toLowerCase() === name.toLowerCase() && (i.serial || '') === $('#invSerial').value.trim());
+  if (dup) { toast(`“${name}” is already in the inventory. Change its amount in the table instead.`, 'bad'); return; }
+  const id = S.editingId || uid();
+  const prev = S.inv.get(id) || {};
+  const ol = onLoanMap()[id] || 0;
+  if (total < ol) { toast(`${ol} unit(s) are on loan, so stock can't go below ${ol}.`, 'bad'); return; }
+  const doc = { ...prev, name, category: $('#invCat').value.trim(), serial: $('#invSerial').value.trim(), total, notes: $('#invNotes').value.trim(),
+    createdAt: prev.createdAt || new Date().toISOString(), updatedAt: new Date().toISOString() };
+  const editing = !!S.editingId;
+  resetInvForm();
+  if (await writeDoc('inventory', id, doc)) toast(editing ? 'Changes saved' : `${name} added`);
+});
+
+/* ---------- new loan ---------- */
+function availableFor(itemId) {
+  const it = S.inv.get(itemId); if (!it) return 0;
+  const inDraft = S.draft.filter(d => d.itemId === itemId).reduce((a, d) => a + d.qty, 0);
+  return (it.total || 0) - (onLoanMap()[itemId] || 0) - inDraft;
+}
+function renderPicker() {
+  const sel = $('#pkItem'), cur = sel.value;
+  const items = sortedInv();
+  if (!items.length) { sel.innerHTML = `<option value="">Add devices in Inventory first</option>`; sel.disabled = true; $('#pkAdd').disabled = true; return; }
+  sel.disabled = false; $('#pkAdd').disabled = false;
+  sel.innerHTML = `<option value="">Choose a device…</option>` + items.map(i => {
+    const av = availableFor(i.id);
+    return `<option value="${i.id}" ${av <= 0 ? 'disabled' : ''}>${esc(i.name)}${i.serial ? ' · ' + esc(i.serial) : ''} (${av} available)</option>`;
+  }).join('');
+  if (cur && S.inv.has(cur)) sel.value = cur;
+}
+$('#pkItem').addEventListener('change', e => { const it = S.inv.get(e.target.value); $('#pkSerial').value = it?.serial || ''; $('#pkQty').value = 1; });
+$('#pkAdd').addEventListener('click', () => {
+  const id = $('#pkItem').value, it = S.inv.get(id);
+  if (!it) { toast('Choose a device first.', 'bad'); return; }
+  const qty = int($('#pkQty').value);
+  if (qty < 1) { toast('Number must be at least 1.', 'bad'); return; }
+  const av = availableFor(id);
+  if (qty > av) { toast(`Only ${av} ${it.name} available.`, 'bad'); return; }
+  const serial = $('#pkSerial').value.trim();
+  const same = S.draft.find(d => d.itemId === id && d.serial === serial);
+  if (same) same.qty += qty; else S.draft.push({ key: uid(), itemId: id, name: it.name, serial, qty });
+  $('#pkItem').value = ''; $('#pkSerial').value = ''; $('#pkQty').value = 1;
+  renderPicker(); renderDraft();
+});
+function renderDraft() {
+  const box = $('#draftTable');
+  if (!S.draft.length) { box.innerHTML = `<div class="empty"><strong>No equipment on this loan yet</strong><span>Pick a device above, set the number and serial, then press “Add to loan”. The paper record holds 10 lines per page; longer loans continue on a second page.</span></div>`; return; }
+  box.innerHTML = `<div class="table-wrap"><table>
+    <thead><tr><th>Item</th><th>Device / component name</th><th>Serial number</th><th class="ctr">Number</th><th></th></tr></thead>
+    <tbody>${S.draft.map((d, i) => `<tr><td class="mono">${i + 1}</td><td class="dev-name">${esc(d.name)}</td>
+      <td>${d.serial ? `<span class="serial">${esc(d.serial)}</span>` : '<span class="muted">–</span>'}</td>
+      <td class="ctr mono">${d.qty}</td><td class="num"><button type="button" class="btn small danger" data-rm="${d.key}">Remove</button></td></tr>`).join('')}</tbody></table></div>`;
+}
+$('#draftTable').addEventListener('click', e => { const b = e.target.closest('[data-rm]'); if (!b) return; S.draft = S.draft.filter(d => d.key !== b.dataset.rm); renderPicker(); renderDraft(); });
+function resetLoanForm() {
+  $('#loanForm').reset(); S.draft = [];
+  $('#lnStart').value = todayISO(); $('#lnEnd').value = addDays(todayISO(), 14);
+  renderPicker(); renderDraft();
+}
+$('#lnClear').addEventListener('click', () => { resetLoanForm(); S.lastSaved = null; renderSaved(); });
+function makeRef(start) {
+  const [y, m, d] = (start || todayISO()).split('-');
+  return `L${y.slice(2)}${m}${d}-${Math.random().toString(36).slice(2, 5).toUpperCase()}`;
+}
+$('#loanForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const names = $('#lnNames').value.trim(), start = $('#lnStart').value, end = $('#lnEnd').value;
+  if (!names) { toast('Enter the borrower name(s).', 'bad'); return; }
+  if (!start || !end) { toast('Set both the start and end date.', 'bad'); return; }
+  if (end < start) { toast('End date is before the start date.', 'bad'); return; }
+  if (!S.draft.length) { toast('Add at least one device to the loan.', 'bad'); return; }
+  for (const d of S.draft) { const it = S.inv.get(d.itemId); if (!it) { toast(`${d.name} is no longer in the inventory.`, 'bad'); return; } }
+  const id = uid();
+  const loan = {
+    ref: makeRef(start), names, group: $('#lnGroup').value.trim(), course: $('#lnCourse').value.trim(),
+    contact: $('#lnContact').value.trim(), notes: $('#lnNotes').value.trim(), startDate: start, endDate: end,
+    items: S.draft.map(d => ({ itemId: d.itemId, name: d.name, serial: d.serial, qty: d.qty, returnedQty: 0 })),
+    status: 'active', createdAt: new Date().toISOString(), returnedAt: null, returnNotes: ''
+  };
+  $('#lnSave').disabled = true;
+  const ok = await writeDoc('loans', id, loan);
+  $('#lnSave').disabled = false;
+  if (!ok) return;
+  S.lastSaved = { ...loan, id };
+  resetLoanForm(); renderSaved();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+});
+function renderSaved() {
+  const box = $('#savedBox'), l = S.lastSaved;
+  if (!l) { box.innerHTML = ''; return; }
+  box.innerHTML = `<div class="saved"><p><b>Loan saved for ${esc(l.names)}.</b> Ref <span class="serial">${esc(l.ref)}</span> · ${l.items.reduce((a, i) => a + i.qty, 0)} unit(s), due back ${fmtDate(l.endDate)}.</p>
+    <div class="actions"><button class="btn primary" data-exp="pdf">Download PDF</button><button class="btn" data-exp="xlsx">Download Excel</button>
+    <button class="btn" data-exp="open">Open in Loans</button><button class="btn" data-exp="close">Dismiss</button></div></div>`;
+}
+$('#savedBox').addEventListener('click', e => {
+  const b = e.target.closest('[data-exp]'); if (!b || !S.lastSaved) return;
+  const l = S.loans.get(S.lastSaved.id) || S.lastSaved;
+  if (b.dataset.exp === 'pdf') exportPdf(l);
+  if (b.dataset.exp === 'xlsx') exportXlsx(l);
+  if (b.dataset.exp === 'open') { S.openLoan = l.id; S.retDraft = null; S.loanFilter = 'open'; setView('loans'); renderAll(); }
+  if (b.dataset.exp === 'close') { S.lastSaved = null; renderSaved(); }
+});
+
+/* ---------- loans list ---------- */
+function renderBadge() {
+  const open = [...S.loans.values()].filter(l => l.status !== 'returned');
+  const overdue = open.filter(l => loanState(l) === 'overdue').length;
+  const b = $('#loanBadge');
+  b.hidden = !open.length; b.textContent = overdue ? `${overdue} overdue` : open.length;
+  b.className = 'badge' + (overdue ? ' alert' : '');
+}
+function renderLoans() {
+  for (const b of document.querySelectorAll('#loanFilter button')) b.setAttribute('aria-pressed', String(b.dataset.f === S.loanFilter));
+  const box = $('#loanTable');
+  if (!S.ready) { box.innerHTML = `<div class="empty"><strong>Loading loans…</strong></div>`; return; }
+  if (!S.loans.size) { box.innerHTML = `<div class="empty"><strong>No loans recorded</strong><span>Create one under “New loan”. Saved loans appear here so you can check equipment back in when it returns.</span></div>`; return; }
+  const q = S.loanQuery.trim().toLowerCase();
+  const list = [...S.loans.values()].filter(l => {
+    const st = loanState(l);
+    if (S.loanFilter === 'open' && st === 'returned') return false;
+    if (S.loanFilter === 'overdue' && st !== 'overdue') return false;
+    if (S.loanFilter === 'returned' && st !== 'returned') return false;
+    if (!q) return true;
+    return [l.names, l.group, l.course, l.ref, l.contact, ...(l.items || []).flatMap(i => [i.name, i.serial])].some(x => (x || '').toLowerCase().includes(q));
+  }).sort((a, b) => {
+    if (S.loanFilter === 'returned') return (b.returnedAt || '').localeCompare(a.returnedAt || '');
+    return (a.endDate || '').localeCompare(b.endDate || '') || (b.createdAt || '').localeCompare(a.createdAt || '');
+  });
+  if (!list.length) {
+    const what = { open: 'No equipment is out right now.', overdue: 'Nothing is overdue.', returned: 'No returned loans yet.', all: 'No loans match.' }[S.loanFilter];
+    box.innerHTML = `<div class="empty"><strong>${q ? 'No match' : what}</strong>${q ? `<span>No loan matches “${esc(S.loanQuery)}”.</span>` : ''}</div>`; return;
+  }
+  box.innerHTML = `<div class="table-wrap"><table>
+    <thead><tr><th>Borrower(s)</th><th>Group · Course</th><th>Start</th><th>Due</th><th class="num">Units out</th><th>Status</th></tr></thead>
+    <tbody>${list.map(l => {
+      const total = (l.items || []).reduce((a, i) => a + i.qty, 0), out = (l.items || []).reduce((a, i) => a + outstandingOf(i), 0);
+      return `<tr class="clickable ${S.openLoan === l.id ? 'selected' : ''}" data-loan="${l.id}" tabindex="0">
+        <td><div class="dev-name">${esc(l.names)}</div><div class="dev-cat mono">${esc(l.ref || '')}</div></td>
+        <td>${esc([l.group, l.course].filter(Boolean).join(' · ')) || '<span class="muted">–</span>'}</td>
+        <td class="mono">${fmtDate(l.startDate)}</td><td class="mono">${fmtDate(l.endDate)}</td>
+        <td class="num mono">${l.status === 'returned' ? 0 : out} / ${total}</td><td>${chip(loanState(l))}</td></tr>`;
+    }).join('')}</tbody></table></div>`;
+}
+$('#loanFilter').addEventListener('click', e => { const b = e.target.closest('button[data-f]'); if (!b) return; S.loanFilter = b.dataset.f; renderLoans(); });
+$('#loanSearch').addEventListener('input', e => { S.loanQuery = e.target.value; renderLoans(); });
+function openLoan(id) {
+  S.openLoan = id; S.retDraft = null; S.pendingLoanDel = false; renderLoans(); renderDetail();
+  if (window.matchMedia('(max-width:980px)').matches) $('#loanDetail').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+$('#loanTable').addEventListener('click', e => { const r = e.target.closest('tr[data-loan]'); if (r) openLoan(r.dataset.loan); });
+$('#loanTable').addEventListener('keydown', e => { const r = e.target.closest('tr[data-loan]'); if (r && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); openLoan(r.dataset.loan); } });
+
+/* ---------- loan detail + return check ---------- */
+function getRetDraft(l) {
+  if (!S.retDraft || S.retDraft.loanId !== l.id) S.retDraft = { loanId: l.id, qty: (l.items || []).map(i => i.returnedQty || 0), notes: l.returnNotes || '' };
+  return S.retDraft;
+}
+function renderDetail() {
+  const box = $('#loanDetail'), l = S.openLoan && S.loans.get(S.openLoan);
+  if (!l) {
+    box.innerHTML = `<div class="empty"><strong>Return check</strong><span>Select a loan to see its equipment, download its loan record again, and tick off what came back.</span></div>`;
+    return;
+  }
+  const st = loanState(l), rd = getRetDraft(l), returned = l.status === 'returned';
+  const allBack = rd.qty.every((q, i) => q >= l.items[i].qty);
+  box.innerHTML = `
+    <div class="panel-head"><div><h2>${esc(l.names)}</h2><div class="dev-cat mono">${esc(l.ref || '')}</div></div>${chip(st)}</div>
+    <dl class="dl">
+      ${l.group ? `<dt>Group</dt><dd>${esc(l.group)}</dd>` : ''}
+      ${l.course ? `<dt>Course</dt><dd>${esc(l.course)}</dd>` : ''}
+      <dt>Start</dt><dd class="mono">${fmtDate(l.startDate)}</dd>
+      <dt>Due</dt><dd class="mono">${fmtDate(l.endDate)}</dd>
+      ${l.returnedAt ? `<dt>Returned</dt><dd class="mono">${fmtDate(l.returnedAt)}</dd>` : ''}
+      ${l.contact ? `<dt>Contact</dt><dd>${esc(l.contact)}</dd>` : ''}
+      ${l.notes ? `<dt>Notes</dt><dd>${esc(l.notes)}</dd>` : ''}
+    </dl>
+    <div class="actions" style="margin-top:12px"><button class="btn small" data-d="pdf">Download PDF</button><button class="btn small" data-d="xlsx">Download Excel</button></div>
+    <hr class="divider">
+    <h3 style="margin-bottom:6px">Return check</h3>
+    <p class="sheet-note" style="margin:0 0 8px">Enter how many of each item came back. Rows still missing something are marked on the left.</p>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Device</th><th class="ctr">Lent</th><th class="ctr">Back</th><th></th></tr></thead>
+      <tbody>${l.items.map((it, i) => {
+        const back = rd.qty[i], done = back >= it.qty;
+        return `<tr class="ret-row ${done ? 'done' : 'miss'}"><td><div class="dev-name">${esc(it.name)}</div>${it.serial ? `<span class="serial">${esc(it.serial)}</span>` : ''}</td>
+          <td class="ctr mono">${it.qty}</td>
+          <td class="ctr"><input class="ret-input" type="number" min="0" max="${it.qty}" step="1" value="${back}" data-ri="${i}" aria-label="${esc(it.name)} returned"></td>
+          <td class="num">${done ? '<span class="chip ok">Back</span>' : `<button class="btn small" data-all="${i}">All back</button>`}</td></tr>`;
+      }).join('')}</tbody></table></div>
+    <div class="field" style="margin-top:10px"><label for="retNotes">Return notes</label><textarea id="retNotes" rows="2" placeholder="Damage, missing cables, who returned it…">${esc(rd.notes)}</textarea></div>
+    <div class="actions" style="margin-top:10px">
+      <button class="btn accent" data-d="markall" ${allBack ? 'disabled' : ''}>Mark everything back</button>
+      <button class="btn primary" data-d="save">${returned ? 'Update return' : 'Save return check'}</button>
+    </div>
+    <hr class="divider">
+    ${S.pendingLoanDel
+      ? `<div class="actions"><span>Delete this loan record for good?</span><button class="btn small danger solid" data-d="del-yes">Delete</button><button class="btn small" data-d="del-no">Keep</button></div>`
+      : `<button class="btn small danger" data-d="del">Delete loan record</button>`}`;
+}
+$('#loanDetail').addEventListener('input', e => {
+  const l = S.loans.get(S.openLoan); if (!l) return; const rd = getRetDraft(l);
+  if (e.target.id === 'retNotes') rd.notes = e.target.value;
+});
+$('#loanDetail').addEventListener('change', e => {
+  const l = S.loans.get(S.openLoan); if (!l) return; const rd = getRetDraft(l);
+  const inp = e.target.closest('[data-ri]');
+  if (inp) { const i = +inp.dataset.ri; rd.qty[i] = Math.min(l.items[i].qty, Math.max(0, int(inp.value))); renderDetail(); }
+});
+$('#loanDetail').addEventListener('click', async e => {
+  const l = S.loans.get(S.openLoan); if (!l) return; const rd = getRetDraft(l);
+  const all = e.target.closest('[data-all]');
+  if (all) { const i = +all.dataset.all; rd.qty[i] = l.items[i].qty; renderDetail(); return; }
+  const b = e.target.closest('[data-d]'); if (!b) return;
+  switch (b.dataset.d) {
+    case 'pdf': exportPdf(l); break;
+    case 'xlsx': exportXlsx(l); break;
+    case 'markall': rd.qty = l.items.map(i => i.qty); renderDetail(); break;
+    case 'save': {
+      const items = l.items.map((it, i) => ({ ...it, returnedQty: rd.qty[i] }));
+      const complete = items.every(i => i.returnedQty >= i.qty);
+      const upd = { ...l, items, returnNotes: rd.notes.trim(), lastCheckedAt: new Date().toISOString(),
+        status: complete ? 'returned' : 'active', returnedAt: complete ? (l.returnedAt || todayISO()) : null };
+      S.retDraft = null;
+      if (await writeDoc('loans', l.id, upd)) {
+        const missing = items.reduce((a, i) => a + outstandingOf(i), 0);
+        toast(complete ? 'Everything is back. Loan closed.' : `Saved. ${missing} unit(s) still out.`);
+      }
+      break;
+    }
+    case 'del': S.pendingLoanDel = true; renderDetail(); break;
+    case 'del-no': S.pendingLoanDel = false; renderDetail(); break;
+    case 'del-yes': S.pendingLoanDel = false; S.openLoan = null; S.retDraft = null;
+      if (await deleteDoc('loans', l.id)) toast('Loan record deleted'); break;
+  }
+});
+
+/* ---------- export ---------- */
+let dlPromise;
+function getDownloads() {
+  if (!dlPromise) dlPromise = (window.claude && window.claude.use) ? window.claude.use('downloads').catch(() => null) : Promise.resolve(null);
+  return dlPromise;
+}
+async function offerFile(filename, blob) {
+  const dl = await getDownloads();
+  if (dl) {
+    try { await dl.save({ filename, data: blob }); toast('Saved ' + filename); }
+    catch (e) {
+      if (e && e.code === 'declined') toast('Download cancelled');
+      else if (e && e.code === 'rate_limited') toast('A download prompt is already open.', 'bad');
+      else toast('Could not save the file' + (e && e.code ? ` (${e.code})` : '') + '.', 'bad');
+    }
+    return;
+  }
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+}
+const loanFileBase = l => `Loan record - ${safeFile(l.names)} - ${l.startDate || todayISO()}`;
+
+function drawLoanPage(doc, l, rows, offset, page, pages) {
+  // Geometry measured from the paper template (A4 landscape, points).
+  const L = 14, R = 827, C1 = 119, C2 = 419, C3 = 596, RH = 25.1;
+  const Y = { title: 89, name: 116, group: 140, course: 164, start: 189, end: 213, blank: 237, head: 261, rows: 286 };
+  const rowsEnd = Y.rows + RH * 10, sigEnd = rowsEnd + 24.5;
+  doc.setDrawColor(80); doc.setLineWidth(0.6);
+  doc.rect(L, Y.title, R - L, sigEnd - Y.title);
+  [Y.name, Y.group, Y.course, Y.start, Y.end, Y.blank, Y.head, Y.rows].forEach(y => doc.line(L, y, R, y));
+  for (let i = 1; i <= 10; i++) doc.line(L, Y.rows + RH * i, R, Y.rows + RH * i);
+  doc.line(C1, Y.name, C1, Y.blank);
+  doc.line(C2, Y.start, C2, Y.blank); doc.line(C3, Y.start, C3, Y.blank);
+  [C1, C2, C3].forEach(x => doc.line(x, Y.head, x, sigEnd));
+
+  doc.setTextColor(0); doc.setFont('helvetica', 'bold'); doc.setFontSize(15);
+  doc.text('ICT Laboratory Equipment Loan Record', (L + R) / 2, Y.title + 18, { align: 'center' });
+  doc.setFontSize(11);
+  [['Name(s)', Y.name], ['Group', Y.group], ['Course', Y.course], ['Start Date', Y.start], ['End Date', Y.end]].forEach(([t, y]) => doc.text(t, L + 6, y + 14));
+  [Y.start, Y.end, rowsEnd].forEach(y => doc.text('Signature', C3 - 6, y + 14, { align: 'right' }));
+  doc.text('Item', (L + C1) / 2, Y.head + 15, { align: 'center' });
+  doc.text('Device/Component name', C1 + 6, Y.head + 15);
+  doc.text('Serial number', (C2 + C3) / 2, Y.head + 15, { align: 'center' });
+  doc.text('Number of components', (C3 + R) / 2, Y.head + 15, { align: 'center' });
+
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(11);
+  const fit = (t, w) => { t = String(t ?? ''); if (doc.getTextWidth(t) <= w) return t; while (t && doc.getTextWidth(t + '…') > w) t = t.slice(0, -1); return t + '…'; };
+  doc.text(fit(l.names, R - C1 - 12), C1 + 6, Y.name + 15);
+  doc.text(fit(l.group, R - C1 - 12), C1 + 6, Y.group + 15);
+  doc.text(fit(l.course, R - C1 - 12), C1 + 6, Y.course + 15);
+  doc.text(fmtDate(l.startDate), C1 + 6, Y.start + 15);
+  doc.text(fmtDate(l.endDate), C1 + 6, Y.end + 15);
+  for (let i = 0; i < 10; i++) {
+    const y = Y.rows + RH * i, it = rows[i];
+    doc.text(String(offset + i + 1), L + 6, y + 14);
+    if (!it) continue;
+    doc.text(fit(it.name, C2 - C1 - 12), C1 + 6, y + 15);
+    if (it.serial) doc.text(fit(it.serial, C3 - C2 - 12), (C2 + C3) / 2, y + 15, { align: 'center' });
+    doc.text(String(it.qty), (C3 + R) / 2, y + 15, { align: 'center' });
+  }
+  doc.setFontSize(8); doc.setTextColor(120);
+  doc.text(`Loan ref ${l.ref || ''}${pages > 1 ? `  ·  page ${page + 1} of ${pages}` : ''}`, L, sigEnd + 14);
+}
+async function exportPdf(l) {
+  if (!window.jspdf) { toast('The PDF tool did not load. Reload the page and try again.', 'bad'); return; }
+  const doc = new window.jspdf.jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
+  doc.setProperties({ title: 'ICT Laboratory Equipment Loan Record - ' + (l.names || '') });
+  const items = l.items || [], pages = Math.max(1, Math.ceil(items.length / 10));
+  for (let p = 0; p < pages; p++) { if (p) doc.addPage(); drawLoanPage(doc, l, items.slice(p * 10, p * 10 + 10), p * 10, p, pages); }
+  await offerFile(loanFileBase(l) + '.pdf', doc.output('blob'));
+}
+async function exportXlsx(l) {
+  if (!window.ExcelJS) { toast('The Excel tool did not load. Reload the page and try again.', 'bad'); return; }
+  const wb = new ExcelJS.Workbook();
+  const ws = wb.addWorksheet('Loan Record', { pageSetup: { paperSize: 9, orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0,
+    margins: { left: 0.3, right: 0.3, top: 0.9, bottom: 0.5, header: 0.3, footer: 0.3 } } });
+  ws.columns = [{ width: 16 }, { width: 50 }, { width: 30 }, { width: 36 }];
+  const thin = { style: 'thin', color: { argb: 'FF505050' } }, border = { top: thin, left: thin, bottom: thin, right: thin };
+  let r = 1;
+  const addRow = (vals, o = {}) => {
+    const row = ws.getRow(r);
+    row.height = o.h || 21;
+    for (let c = 1; c <= 4; c++) {
+      const cell = row.getCell(c);
+      if (vals[c - 1] !== undefined) cell.value = vals[c - 1];
+      cell.border = border;
+      cell.font = { name: 'Calibri', size: 11, bold: !!(o.bold && o.bold[c - 1]) };
+      cell.alignment = Object.assign({ vertical: 'top', horizontal: 'left', wrapText: true }, (o.align && o.align[c - 1]) || {});
+    }
+    return r++;
+  };
+  const ctr = { horizontal: 'center' }, right = { horizontal: 'right' };
+  const t = addRow(['ICT Laboratory Equipment Loan Record'], { h: 26, align: [{ horizontal: 'center', vertical: 'middle' }] });
+  ws.mergeCells(t, 1, t, 4); ws.getCell(t, 1).font = { name: 'Calibri', size: 15, bold: true };
+  for (const [k, v] of [['Name(s)', l.names], ['Group', l.group], ['Course', l.course]]) { const x = addRow([k, v || ''], { bold: [1] }); ws.mergeCells(x, 2, x, 4); }
+  addRow(['Start Date', fmtDate(l.startDate), 'Signature', ''], { bold: [1, 0, 1], align: [0, 0, right] });
+  addRow(['End Date', fmtDate(l.endDate), 'Signature', ''], { bold: [1, 0, 1], align: [0, 0, right] });
+  const blank = addRow([]); ws.mergeCells(blank, 1, blank, 4);
+  addRow(['Item', 'Device/Component name', 'Serial number', 'Number of components'], { bold: [1, 1, 1, 1], align: [ctr, 0, ctr, ctr] });
+  const items = l.items || [], n = Math.max(10, items.length);
+  for (let i = 0; i < n; i++) { const it = items[i]; addRow([i + 1, it ? it.name : '', it ? (it.serial || '') : '', it ? it.qty : ''], { align: [0, 0, ctr, ctr] }); }
+  addRow(['', '', 'Signature', ''], { bold: [0, 0, 1], align: [0, 0, right] });
+  const ref = ws.getCell(r + 1, 1); ref.value = `Loan ref ${l.ref || ''}`; ref.font = { name: 'Calibri', size: 9, color: { argb: 'FF7A7A7A' } };
+  const buf = await wb.xlsx.writeBuffer();
+  await offerFile(loanFileBase(l) + '.xlsx', new Blob([buf]));
+}
+$('#invExport').addEventListener('click', async () => {
+  if (!S.inv.size) { toast('The inventory is empty.', 'bad'); return; }
+  if (!window.ExcelJS) { toast('The Excel tool did not load. Reload the page and try again.', 'bad'); return; }
+  const wb = new ExcelJS.Workbook(), ws = wb.addWorksheet('Inventory');
+  ws.columns = [{ header: 'Device / component', width: 38 }, { header: 'Category', width: 20 }, { header: 'Serial / asset no.', width: 22 },
+    { header: 'In stock', width: 10 }, { header: 'On loan', width: 10 }, { header: 'Available', width: 11 }, { header: 'Notes', width: 40 }];
+  ws.getRow(1).font = { bold: true };
+  const ol = onLoanMap();
+  for (const i of sortedInv()) ws.addRow([i.name, i.category || '', i.serial || '', i.total || 0, ol[i.id] || 0, (i.total || 0) - (ol[i.id] || 0), i.notes || '']);
+  ws.views = [{ state: 'frozen', ySplit: 1 }];
+  const buf = await wb.xlsx.writeBuffer();
+  await offerFile(`ICT lab inventory ${todayISO()}.xlsx`, new Blob([buf]));
+});
+
+/* ---------- boot ---------- */
+resetLoanForm();
+setView((location.hash || '').slice(1) || 'inventory', false);
+renderAll();
+startStorage();
+</script>
