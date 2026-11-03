@@ -145,7 +145,15 @@ input:focus,select:focus,textarea:focus{border-color:var(--focus);outline:none;b
 .toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
 .toolbar input[type=search]{width:240px;max-width:100%}
 .btn[aria-expanded="true"]{background:var(--sunken);border-color:var(--brand);color:var(--brand)}
-.adv{display:grid;grid-template-columns:repeat(4,minmax(0,1fr)) auto;gap:12px;align-items:end;padding:14px 18px;margin-top:-6px}
+th.sortable{padding:0}
+th.sortable button{all:unset;box-sizing:border-box;display:flex;align-items:center;gap:5px;width:100%;padding:9px 12px;cursor:pointer;font-weight:600}
+th.sortable.num button{justify-content:flex-end}
+th.sortable.ctr button{justify-content:center}
+th.sortable button:hover{background:var(--line)}
+th.sortable button:focus-visible{outline:2px solid var(--focus);outline-offset:-2px}
+th.sortable .arrow{font-size:.7rem;color:var(--muted);width:.8em}
+th.sortable[aria-sort="ascending"] .arrow,th.sortable[aria-sort="descending"] .arrow{color:var(--brand)}
+.adv{display:grid;grid-template-columns:repeat(3,minmax(0,1fr)) auto;gap:12px;align-items:end;padding:14px 18px;margin-top:-6px}
 @media (max-width:1100px){.adv{grid-template-columns:repeat(2,minmax(0,1fr))}.adv-actions{grid-column:1/-1}}
 @media (max-width:560px){.adv{grid-template-columns:minmax(0,1fr)}}
 .label-row{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
@@ -286,14 +294,6 @@ tr.confirm td{background:var(--bad-soft)}
               <option value="name">Device name</option>
               <option value="serial">Serial / asset no.</option>
               <option value="notes">Notes</option>
-            </select></div>
-          <div class="field"><label for="fSort">Sort by</label>
-            <select id="fSort">
-              <option value="name">Device name (A–Z)</option>
-              <option value="category">Category</option>
-              <option value="available">Most available first</option>
-              <option value="stock">Largest stock first</option>
-              <option value="onloan">Most on loan first</option>
             </select></div>
           <div class="actions adv-actions"><button class="btn" type="button" id="fClear">Clear filters</button><span class="sheet-note" id="fCount"></span></div>
         </div>
@@ -762,21 +762,30 @@ function renderInventory() {
     if (f.avail === 'onloan' && ol <= 0) return false;
     return true;
   });
-  const byName = (a, b) => (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base' });
-  const avOf = i => (i.total || 0) - (onLoan[i.id] || 0);
-  const sorters = {
-    name: byName,
-    category: (a, b) => (a.category || '￿').localeCompare(b.category || '￿') || byName(a, b),
-    available: (a, b) => avOf(b) - avOf(a) || byName(a, b),
-    stock: (a, b) => (b.total || 0) - (a.total || 0) || byName(a, b),
-    onloan: (a, b) => (onLoan[b.id] || 0) - (onLoan[a.id] || 0) || byName(a, b),
+  const cmpText = (x, y) => x.localeCompare(y, undefined, { sensitivity: 'base', numeric: true });
+  const byName = (a, b) => cmpText(a.name || '', b.name || '');
+  const getters = {
+    name: i => i.name || '', category: i => i.category || '', serial: i => i.serial || '',
+    stock: i => i.total || 0, onloan: i => onLoan[i.id] || 0, available: i => (i.total || 0) - (onLoan[i.id] || 0),
   };
-  rows.sort(sorters[f.sort] || byName);
+  const { key, dir } = S.sort, get = getters[key] || getters.name;
+  rows.sort((a, b) => {
+    const x = get(a), y = get(b);
+    if (typeof x === 'string') {
+      if (!x !== !y) return x ? -1 : 1; // blanks always last
+      return dir * cmpText(x, y) || byName(a, b);
+    }
+    return dir * (x - y) || byName(a, b);
+  });
+  const th = (k, label, cls = '') => {
+    const on = S.sort.key === k, state = on ? (S.sort.dir > 0 ? 'ascending' : 'descending') : 'none';
+    return `<th class="sortable ${cls}" aria-sort="${state}"><button type="button" data-sort="${k}" title="Sort by ${label.toLowerCase()}">${label}<span class="arrow" aria-hidden="true">${on ? (S.sort.dir > 0 ? '▲' : '▼') : '↕'}</span></button></th>`;
+  };
   const filtering = !!(q || f.cat || f.avail);
   $('#fCount').textContent = filtering ? `Showing ${rows.length} of ${S.inv.size} devices` : '';
   if (!rows.length) { box.innerHTML = `<div class="empty"><strong>No match</strong><span>No devices match this search. Try other words or clear the filters.</span></div>`; return; }
   box.innerHTML = `<div class="table-wrap"><table>
-    <thead><tr><th>Device</th><th>Category</th><th>Serial / asset</th><th class="ctr">In stock</th><th class="num">On loan</th><th class="num">Available</th><th></th></tr></thead>
+    <thead><tr>${th('name', 'Device')}${th('category', 'Category')}${th('serial', 'Serial / asset')}${th('stock', 'In stock', 'ctr')}${th('onloan', 'On loan', 'num')}${th('available', 'Available', 'num')}<th></th></tr></thead>
     <tbody>${rows.map(i => {
       const ol = onLoan[i.id] || 0, av = (i.total || 0) - ol;
       if (S.pendingDel === i.id) return `<tr class="confirm"><td colspan="6"><b>Delete “${esc(i.name)}”?</b> This removes it from the inventory. Past loan records keep its name.</td>
@@ -824,7 +833,19 @@ $('#invTable').addEventListener('change', e => { const i = e.target.closest('inp
 $('#invSearch').addEventListener('input', e => { S.invQuery = e.target.value; renderInventory(); });
 
 /* ---------- advanced search ---------- */
-S.f = { cat: '', avail: '', field: 'all', sort: 'name' };
+S.f = { cat: '', avail: '', field: 'all' };
+const SORT_KEY = 'ict-lab-loan-desk-sort';
+S.sort = { key: 'name', dir: 1 };
+try { const s = JSON.parse(localStorage.getItem(SORT_KEY) || 'null'); if (s && s.key && (s.dir === 1 || s.dir === -1)) S.sort = s; } catch (e) {}
+$('#invTable').addEventListener('click', e => {
+  const b = e.target.closest('button[data-sort]'); if (!b) return;
+  const k = b.dataset.sort;
+  if (S.sort.key === k) S.sort.dir = -S.sort.dir;
+  else S.sort = { key: k, dir: ['stock', 'onloan', 'available'].includes(k) ? -1 : 1 }; // numbers start with the largest
+  try { localStorage.setItem(SORT_KEY, JSON.stringify(S.sort)); } catch (err) {}
+  renderInventory();
+  const again = document.querySelector(`#invTable button[data-sort="${k}"]`); if (again) again.focus();
+});
 function renderFilters() {
   const sel = $('#fCat'), cur = S.f.cat;
   const cats = [...new Set([...S.inv.values()].map(i => i.category).filter(Boolean))].sort((a, b) => a.localeCompare(b));
@@ -840,12 +861,12 @@ $('#advToggle').addEventListener('click', () => {
   $('#advToggle').setAttribute('aria-expanded', String(!p.hidden));
   if (!p.hidden) $('#fCat').focus();
 });
-for (const [id, key] of [['#fCat', 'cat'], ['#fAvail', 'avail'], ['#fField', 'field'], ['#fSort', 'sort']]) {
+for (const [id, key] of [['#fCat', 'cat'], ['#fAvail', 'avail'], ['#fField', 'field']]) {
   $(id).addEventListener('change', e => { S.f[key] = e.target.value; renderFilters(); renderInventory(); });
 }
 $('#fClear').addEventListener('click', () => {
-  S.f = { cat: '', avail: '', field: 'all', sort: 'name' }; S.invQuery = '';
-  $('#invSearch').value = ''; $('#fAvail').value = ''; $('#fField').value = 'all'; $('#fSort').value = 'name';
+  S.f = { cat: '', avail: '', field: 'all' }; S.invQuery = '';
+  $('#invSearch').value = ''; $('#fAvail').value = ''; $('#fField').value = 'all';
   renderFilters(); renderInventory();
 });
 /* ---------- category manager ---------- */
