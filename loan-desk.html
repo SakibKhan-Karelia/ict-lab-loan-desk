@@ -148,6 +148,10 @@ input:focus,select:focus,textarea:focus{border-color:var(--focus);outline:none;b
 .adv{display:grid;grid-template-columns:repeat(4,minmax(0,1fr)) auto;gap:12px;align-items:end;padding:14px 18px;margin-top:-6px}
 @media (max-width:1100px){.adv{grid-template-columns:repeat(2,minmax(0,1fr))}.adv-actions{grid-column:1/-1}}
 @media (max-width:560px){.adv{grid-template-columns:minmax(0,1fr)}}
+.label-row{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.link-btn{border:0;background:none;padding:0;color:var(--focus);font-size:.84rem;font-weight:500;cursor:pointer;text-decoration:underline;text-underline-offset:2px}
+.link-btn:hover{text-decoration-thickness:2px}
+.cat-input{max-width:320px}
 .cat-link{border:0;background:none;padding:0;color:inherit;cursor:pointer;text-align:left;font:inherit}
 .cat-link:hover{color:var(--focus);text-decoration:underline}
 
@@ -297,7 +301,7 @@ tr.confirm td{background:var(--bad-soft)}
           <div class="add-bar-title"><h2 id="invFormTitle">Add device</h2></div>
           <div class="add-bar">
             <div class="field"><label for="invName">Device / component name</label><input type="text" id="invName" required placeholder="e.g. Raspberry Pi 4 Model B"></div>
-            <div class="field"><label for="invCat">Category</label><input type="text" id="invCat" list="catList" placeholder="e.g. Microcontrollers"><datalist id="catList"></datalist></div>
+            <div class="field"><div class="label-row"><label for="invCat">Category</label><button type="button" class="link-btn" id="catManage" aria-controls="catPanel" aria-expanded="false">Manage</button></div><input type="text" id="invCat" list="catList" placeholder="e.g. Microcontrollers"><datalist id="catList"></datalist></div>
             <div class="field"><label for="invSerial">Serial / asset no.</label><input type="text" id="invSerial" placeholder="Optional"></div>
             <div class="field"><label for="invTotal">In stock</label><input type="number" id="invTotal" min="0" step="1" value="1" required></div>
             <div class="field"><label for="invNotes">Notes</label><input type="text" id="invNotes" placeholder="Shelf, condition, accessories…"></div>
@@ -307,6 +311,10 @@ tr.confirm td{background:var(--bad-soft)}
             </div>
           </div>
         </form>
+        <div class="box" id="catPanel" hidden>
+          <div class="box-head"><h2>Categories</h2><div class="actions"><span class="sheet-note">Renaming or removing a category updates every device in it.</span><button class="btn small" type="button" id="catClose">Close</button></div></div>
+          <div id="catTable"></div>
+        </div>
         <div class="box" id="invTable"></div>
       </section>
 
@@ -714,7 +722,7 @@ function setView(v, push = true) {
 document.querySelector('.tabs').addEventListener('click', e => { const b = e.target.closest('button[data-view]'); if (b) setView(b.dataset.view); });
 
 /* ---------- render ---------- */
-function renderAll() { renderStats(); renderFilters(); renderInventory(); renderPicker(); renderDraft(); renderSaved(); renderLoans(); renderDetail(); renderBadge(); }
+function renderAll() { renderStats(); renderFilters(); renderCats(); renderInventory(); renderPicker(); renderDraft(); renderSaved(); renderLoans(); renderDetail(); renderBadge(); }
 
 function renderStats() {
   const onLoan = onLoanMap();
@@ -840,6 +848,83 @@ $('#fClear').addEventListener('click', () => {
   $('#invSearch').value = ''; $('#fAvail').value = ''; $('#fField').value = 'all'; $('#fSort').value = 'name';
   renderFilters(); renderInventory();
 });
+/* ---------- category manager ---------- */
+S.catEdit = null; S.catDel = null;
+function categoryRows() {
+  const m = new Map();
+  for (const i of S.inv.values()) {
+    if (!i.category) continue;
+    const r = m.get(i.category) || { name: i.category, devices: 0, units: 0 };
+    r.devices++; r.units += i.total || 0; m.set(i.category, r);
+  }
+  return [...m.values()].sort((a, b) => a.name.localeCompare(b.name));
+}
+function renderCats() {
+  const box = $('#catTable'); if (!box || $('#catPanel').hidden) return;
+  const rows = categoryRows();
+  if (!rows.length) { box.innerHTML = `<div class="empty"><strong>No categories yet</strong><span>Type a category when you add or edit a device.</span></div>`; return; }
+  box.innerHTML = `<div class="table-wrap"><table>
+    <thead><tr><th>Category</th><th class="num">Devices</th><th class="num">Units</th><th></th></tr></thead>
+    <tbody>${rows.map(r => {
+      const k = esc(r.name);
+      if (S.catEdit === r.name) return `<tr><td colspan="3"><input type="text" class="cat-input" id="catRenameInput" value="${k}" aria-label="New name for ${k}"></td>
+        <td class="num"><div class="actions" style="justify-content:flex-end;flex-wrap:nowrap"><button class="btn small primary" type="button" data-cat-act="save" data-cat="${k}">Save</button><button class="btn small" type="button" data-cat-act="cancel">Cancel</button></div></td></tr>`;
+      if (S.catDel === r.name) return `<tr class="confirm"><td colspan="3"><b>Remove “${k}”?</b> ${r.devices > 1 ? `Its ${r.devices} devices will have no category. They stay in the inventory.` : 'Its device will have no category. It stays in the inventory.'}</td>
+        <td class="num"><div class="actions" style="justify-content:flex-end;flex-wrap:nowrap"><button class="btn small danger solid" type="button" data-cat-act="del-yes" data-cat="${k}">Remove</button><button class="btn small" type="button" data-cat-act="cancel">Keep</button></div></td></tr>`;
+      return `<tr><td class="dev-name">${k}</td><td class="num">${r.devices}</td><td class="num">${r.units}</td>
+        <td class="num"><div class="actions" style="justify-content:flex-end;flex-wrap:nowrap"><button class="btn small" type="button" data-cat-act="edit" data-cat="${k}">Rename</button><button class="btn small danger" type="button" data-cat-act="del" data-cat="${k}">Remove</button></div></td></tr>`;
+    }).join('')}</tbody></table></div>`;
+  const inp = $('#catRenameInput'); if (inp && document.activeElement !== inp) { inp.focus(); inp.select(); }
+}
+async function setCategory(oldName, newName) {
+  const items = [...S.inv.values()].filter(i => (i.category || '') === oldName);
+  for (const it of items) {
+    const ok = await writeDoc('inventory', it.id, { ...it, category: newName, updatedAt: new Date().toISOString() });
+    if (!ok) return false;
+  }
+  if (S.f.cat === oldName) S.f.cat = newName;
+  return items.length;
+}
+async function renameCategory(oldName, raw) {
+  let newName = (raw || '').trim().replace(/\s+/g, ' ');
+  if (!newName) { toast('Enter a name, or use Remove instead.', 'bad'); return; }
+  if (newName === oldName) { S.catEdit = null; renderCats(); return; }
+  const existing = categoryRows().find(r => r.name !== oldName && r.name.toLowerCase() === newName.toLowerCase());
+  if (existing) newName = existing.name;
+  S.catEdit = null;
+  const n = await setCategory(oldName, newName);
+  if (n !== false) toast(existing ? `Moved ${n} device${n > 1 ? 's' : ''} into “${newName}”` : `Renamed “${oldName}” to “${newName}”`);
+  renderAll();
+}
+$('#catManage').addEventListener('click', () => {
+  const p = $('#catPanel'); p.hidden = !p.hidden;
+  $('#catManage').setAttribute('aria-expanded', String(!p.hidden));
+  S.catEdit = null; S.catDel = null; renderCats();
+  if (!p.hidden) p.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+});
+$('#catClose').addEventListener('click', () => { $('#catPanel').hidden = true; $('#catManage').setAttribute('aria-expanded', 'false'); });
+$('#catTable').addEventListener('click', async e => {
+  const b = e.target.closest('[data-cat-act]'); if (!b) return;
+  const name = b.dataset.cat;
+  switch (b.dataset.catAct) {
+    case 'edit': S.catEdit = name; S.catDel = null; renderCats(); break;
+    case 'del': S.catDel = name; S.catEdit = null; renderCats(); break;
+    case 'cancel': S.catEdit = null; S.catDel = null; renderCats(); break;
+    case 'save': renameCategory(name, $('#catRenameInput').value); break;
+    case 'del-yes': {
+      S.catDel = null;
+      const n = await setCategory(name, '');
+      if (n !== false) toast(`Removed “${name}” from ${n} device${n > 1 ? 's' : ''}`);
+      renderAll(); break;
+    }
+  }
+});
+$('#catTable').addEventListener('keydown', e => {
+  if (e.target.id !== 'catRenameInput') return;
+  if (e.key === 'Enter') { e.preventDefault(); renameCategory(S.catEdit, e.target.value); }
+  if (e.key === 'Escape') { S.catEdit = null; renderCats(); }
+});
+
 function filterByCategory(cat) {
   S.f.cat = cat; $('#advPanel').hidden = false; $('#advToggle').setAttribute('aria-expanded', 'true');
   renderFilters(); renderInventory();
