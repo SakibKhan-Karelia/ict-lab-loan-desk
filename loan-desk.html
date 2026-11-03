@@ -6,25 +6,28 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
 <style>
-/* Layout: sticky tab bar over a working surface; inventory = form rail + stock table, loans = list + return-check panel. Label-maker yellow marks tags and the active tab. */
+/* Layout: sticky tab bar over a working surface; inventory = form rail + stock table, loans = list + return-check panel. Karelia green: light green (#68C04E) marks tags and the active tab, dark green (#006838) is the main action colour. */
 :root{
-  --bg:#f1f2ee; --surface:#ffffff; --sunken:#e8eae4; --ink:#1b1f23; --muted:#5b636a; --line:#d5d9d1;
-  --accent:#f3c234; --accent-ink:#231b00; --focus:#2b62d9;
-  --ok:#256c45; --ok-soft:#dcefe3; --warn:#8a5300; --warn-soft:#fbecd2; --bad:#a3221b; --bad-soft:#f8dedb; --info-soft:#e3e8f6;
+  --bg:#f2f5f1; --surface:#ffffff; --sunken:#e7ede6; --ink:#16211a; --muted:#56635a; --line:#d3ddd2;
+  --accent:#68c04e; --accent-ink:#0b2810; --focus:#00703c;
+  --brand:#006838; --on-brand:#ffffff; --logo-bg:#ffffff;
+  --ok:#1f6e3d; --ok-soft:#dcf0dc; --warn:#8a5300; --warn-soft:#fbecd2; --bad:#a3221b; --bad-soft:#f8dedb; --info-soft:#e2ece4;
   --f-display:"Archivo","Arial Narrow",system-ui,sans-serif;
   --f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
   --f-mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
   --r:6px;
 }
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
-  --bg:#14171a; --surface:#1c2024; --sunken:#111417; --ink:#e7eaec; --muted:#9aa3aa; --line:#2e3439;
-  --accent:#f3c234; --accent-ink:#1d1600; --focus:#7aa2ff;
-  --ok:#6fcf97; --ok-soft:#1d3327; --warn:#f0b257; --warn-soft:#3a2c14; --bad:#ff8a80; --bad-soft:#3d1f1d; --info-soft:#232b3d;
+  --bg:#111713; --surface:#18201b; --sunken:#0d120f; --ink:#e5ece6; --muted:#97a59b; --line:#2a362e;
+  --accent:#68c04e; --accent-ink:#0b2810; --focus:#86d46c;
+  --brand:#68c04e; --on-brand:#0b2810; --logo-bg:#ffffff;
+  --ok:#7bd77f; --ok-soft:#183322; --warn:#f0b257; --warn-soft:#3a2c14; --bad:#ff8a80; --bad-soft:#3d1f1d; --info-soft:#1d2d22;
   color-scheme:dark }}
 :root[data-theme="dark"]{
-  --bg:#14171a; --surface:#1c2024; --sunken:#111417; --ink:#e7eaec; --muted:#9aa3aa; --line:#2e3439;
-  --accent:#f3c234; --accent-ink:#1d1600; --focus:#7aa2ff;
-  --ok:#6fcf97; --ok-soft:#1d3327; --warn:#f0b257; --warn-soft:#3a2c14; --bad:#ff8a80; --bad-soft:#3d1f1d; --info-soft:#232b3d;
+  --bg:#111713; --surface:#18201b; --sunken:#0d120f; --ink:#e5ece6; --muted:#97a59b; --line:#2a362e;
+  --accent:#68c04e; --accent-ink:#0b2810; --focus:#86d46c;
+  --brand:#68c04e; --on-brand:#0b2810; --logo-bg:#ffffff;
+  --ok:#7bd77f; --ok-soft:#183322; --warn:#f0b257; --warn-soft:#3a2c14; --bad:#ff8a80; --bad-soft:#3d1f1d; --info-soft:#1d2d22;
   color-scheme:dark }
 *{box-sizing:border-box}
 body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:14px;line-height:1.45}
@@ -41,7 +44,11 @@ button,input,select,textarea{font:inherit;color:inherit}
 /* top bar */
 .top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--surface);border-bottom:1px solid var(--line)}
 .top-in{display:flex;align-items:center;justify-content:space-between;gap:12px 20px;flex-wrap:wrap;padding-block:10px}
-.brand{display:flex;align-items:center;gap:10px}
+.brand{display:flex;align-items:center;gap:12px;min-width:0}
+.logo{height:40px;width:auto;display:block;background:var(--logo-bg);border-radius:4px}
+.brand-sep{width:1px;align-self:stretch;background:var(--line)}
+.brand-name{display:flex;align-items:center;gap:8px}
+@media (max-width:520px){.logo{height:32px}.brand-sep{display:none}.brand h1{font-size:1.1rem}}
 .tag{font-family:var(--f-mono);font-weight:500;font-size:.78rem;letter-spacing:.08em;background:var(--accent);color:var(--accent-ink);padding:3px 8px;border-radius:3px;box-shadow:inset 0 -2px 0 rgba(0,0,0,.12)}
 .brand h1{font-size:1.3rem;font-weight:800}
 .tabs{display:flex;gap:4px;flex-wrap:wrap}
@@ -97,7 +104,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--focus);outline:none;b
 
 .btn{border:1px solid var(--line);background:var(--surface);border-radius:var(--r);padding:8px 14px;cursor:pointer;font-weight:600;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
 .btn:hover{background:var(--sunken)}
-.btn.primary{background:var(--ink);border-color:var(--ink);color:var(--bg)}
+.btn.primary{background:var(--brand);border-color:var(--brand);color:var(--on-brand)}
 .btn.primary:hover{opacity:.88}
 .btn.accent{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
 .btn.accent:hover{filter:brightness(.95)}
@@ -142,7 +149,7 @@ tr.confirm td{background:var(--bad-soft)}
 .seg{display:inline-flex;border:1px solid var(--line);border-radius:var(--r);overflow:hidden;flex-wrap:wrap}
 .seg button{border:0;background:var(--surface);padding:6px 12px;cursor:pointer;font-weight:600;color:var(--muted)}
 .seg button+button{border-left:1px solid var(--line)}
-.seg button[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
+.seg button[aria-pressed="true"]{background:var(--brand);color:var(--on-brand)}
 .toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:space-between;margin-bottom:12px}
 .toolbar input[type=search]{max-width:260px}
 
@@ -170,7 +177,11 @@ tr.confirm td{background:var(--bad-soft)}
 
 <header class="top">
   <div class="wrap top-in">
-    <div class="brand"><span class="tag">ICT·LAB</span><h1>Loan Desk</h1></div>
+    <div class="brand">
+      <img class="logo" src="karelia-logo.png" alt="Karelia University of Applied Sciences" width="428" height="124">
+      <span class="brand-sep" aria-hidden="true"></span>
+      <div class="brand-name"><span class="tag">ICT·LAB</span><h1>Loan Desk</h1></div>
+    </div>
     <nav class="tabs" role="tablist" aria-label="Sections">
       <button id="tab-inventory" role="tab" data-view="inventory" aria-selected="true">Inventory</button>
       <button id="tab-new" role="tab" data-view="new" aria-selected="false">New loan</button>
