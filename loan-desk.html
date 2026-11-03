@@ -145,8 +145,9 @@ input:focus,select:focus,textarea:focus{border-color:var(--focus);outline:none;b
 .toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
 .toolbar input[type=search]{width:240px;max-width:100%}
 .btn[aria-expanded="true"]{background:var(--sunken);border-color:var(--brand);color:var(--brand)}
-.sort-by{display:flex;align-items:center;gap:8px;font-size:.9rem;font-weight:600;white-space:nowrap}
-.sort-by select{width:auto;min-width:170px}
+.sort-by{display:inline-flex;align-items:center;gap:8px;font-weight:600;white-space:nowrap}
+.sort-by select{width:auto;min-width:160px;padding:3px 8px;font-weight:400;font-size:.88rem}
+th.sort-th{padding-block:5px;text-align:right}
 .adv{display:grid;grid-template-columns:repeat(3,minmax(0,1fr)) auto;gap:12px;align-items:end;padding:14px 18px;margin-top:-6px}
 @media (max-width:1100px){.adv{grid-template-columns:repeat(2,minmax(0,1fr))}.adv-actions{grid-column:1/-1}}
 @media (max-width:560px){.adv{grid-template-columns:minmax(0,1fr)}}
@@ -269,20 +270,6 @@ tr.confirm td{background:var(--bad-soft)}
           <h1>Inventory</h1>
           <div class="toolbar">
             <input type="search" id="invSearch" placeholder="Search devices" aria-label="Search devices">
-            <label class="sort-by"><span>Sort by</span>
-              <select id="invSort">
-                <option value="newest">Newest added</option>
-                <option value="oldest">Oldest added</option>
-                <option value="modified">Recently modified</option>
-                <option value="az">Name A–Z</option>
-                <option value="za">Name Z–A</option>
-                <option value="category">Category A–Z</option>
-                <option value="mostAvail">Most available</option>
-                <option value="leastAvail">Least available</option>
-                <option value="mostStock">Most in stock</option>
-                <option value="mostLoan">Most on loan</option>
-              </select>
-            </label>
             <button class="btn" id="advToggle" type="button" aria-expanded="false" aria-controls="advPanel">Advanced search</button>
             <button class="btn" id="invExport" type="button">Export to Excel</button>
           </div>
@@ -791,7 +778,8 @@ function renderInventory() {
   $('#fCount').textContent = filtering ? `Showing ${rows.length} of ${S.inv.size} devices` : '';
   if (!rows.length) { box.innerHTML = `<div class="empty"><strong>No match</strong><span>No devices match this search. Try other words or clear the filters.</span></div>`; return; }
   box.innerHTML = `<div class="table-wrap"><table>
-    <thead><tr><th>Device</th><th>Category</th><th>Serial / asset</th><th class="ctr">In stock</th><th class="num">On loan</th><th class="num">Available</th><th></th></tr></thead>
+    <thead><tr><th>Device</th><th>Category</th><th>Serial / asset</th><th class="ctr">In stock</th><th class="num">On loan</th><th class="num">Available</th>
+      <th class="sort-th"><label class="sort-by">Sort by <select id="invSort">${SORT_OPTIONS.map(([v, t]) => `<option value="${v}"${v === S.sort ? ' selected' : ''}>${t}</option>`).join('')}</select></label></th></tr></thead>
     <tbody>${rows.map(i => {
       const ol = onLoan[i.id] || 0, av = (i.total || 0) - ol;
       if (S.pendingDel === i.id) return `<tr class="confirm"><td colspan="6"><b>Delete “${esc(i.name)}”?</b> This removes it from the inventory. Past loan records keep its name.</td>
@@ -841,13 +829,19 @@ $('#invSearch').addEventListener('input', e => { S.invQuery = e.target.value; re
 /* ---------- advanced search ---------- */
 S.f = { cat: '', avail: '', field: 'all' };
 const SORT_KEY = 'ict-lab-loan-desk-sort-v2';
+const SORT_OPTIONS = [
+  ['newest', 'Newest added'], ['oldest', 'Oldest added'], ['modified', 'Recently modified'],
+  ['az', 'Name A–Z'], ['za', 'Name Z–A'], ['category', 'Category A–Z'],
+  ['mostAvail', 'Most available'], ['leastAvail', 'Least available'], ['mostStock', 'Most in stock'], ['mostLoan', 'Most on loan'],
+];
 S.sort = 'newest';
-try { const s = localStorage.getItem(SORT_KEY); if (s && [...$('#invSort').options].some(o => o.value === s)) S.sort = s; } catch (e) {}
-$('#invSort').value = S.sort;
-$('#invSort').addEventListener('change', e => {
+try { const s = localStorage.getItem(SORT_KEY); if (s && SORT_OPTIONS.some(o => o[0] === s)) S.sort = s; } catch (e) {}
+$('#invTable').addEventListener('change', e => {
+  if (e.target.id !== 'invSort') return;
   S.sort = e.target.value;
   try { localStorage.setItem(SORT_KEY, S.sort); } catch (err) {}
   renderInventory();
+  const sel = $('#invSort'); if (sel) sel.focus();
 });
 function renderFilters() {
   const sel = $('#fCat'), cur = S.f.cat;
