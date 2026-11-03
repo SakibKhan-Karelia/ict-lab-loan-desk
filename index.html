@@ -153,6 +153,12 @@ input:focus,select:focus,textarea:focus{border-color:var(--focus);outline:none;b
 
 .toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
 .toolbar input[type=search]{width:240px;max-width:100%}
+.btn[aria-expanded="true"]{background:var(--sunken);border-color:var(--brand);color:var(--brand)}
+.adv{display:grid;grid-template-columns:repeat(4,minmax(0,1fr)) auto;gap:12px;align-items:end;padding:14px 18px;margin-top:-6px}
+@media (max-width:1100px){.adv{grid-template-columns:repeat(2,minmax(0,1fr))}.adv-actions{grid-column:1/-1}}
+@media (max-width:560px){.adv{grid-template-columns:minmax(0,1fr)}}
+.cat-link{border:0;background:none;padding:0;color:inherit;cursor:pointer;text-align:left;font:inherit}
+.cat-link:hover{color:var(--focus);text-decoration:underline}
 
 /* tables */
 .table-wrap{overflow-x:auto}
@@ -266,8 +272,35 @@ tr.confirm td{background:var(--bad-soft)}
           <h1>Inventory</h1>
           <div class="toolbar">
             <input type="search" id="invSearch" placeholder="Search devices" aria-label="Search devices">
+            <button class="btn" id="advToggle" type="button" aria-expanded="false" aria-controls="advPanel">Advanced search</button>
             <button class="btn" id="invExport" type="button">Export to Excel</button>
           </div>
+        </div>
+        <div class="box adv" id="advPanel" hidden>
+          <div class="field"><label for="fCat">Category</label><select id="fCat"></select></div>
+          <div class="field"><label for="fAvail">Availability</label>
+            <select id="fAvail">
+              <option value="">Any</option>
+              <option value="available">Available to lend</option>
+              <option value="none">None available</option>
+              <option value="onloan">Some on loan</option>
+            </select></div>
+          <div class="field"><label for="fField">Search text in</label>
+            <select id="fField">
+              <option value="all">All fields</option>
+              <option value="name">Device name</option>
+              <option value="serial">Serial / asset no.</option>
+              <option value="notes">Notes</option>
+            </select></div>
+          <div class="field"><label for="fSort">Sort by</label>
+            <select id="fSort">
+              <option value="name">Device name (A–Z)</option>
+              <option value="category">Category</option>
+              <option value="available">Most available first</option>
+              <option value="stock">Largest stock first</option>
+              <option value="onloan">Most on loan first</option>
+            </select></div>
+          <div class="actions adv-actions"><button class="btn" type="button" id="fClear">Clear filters</button><span class="sheet-note" id="fCount"></span></div>
         </div>
         <form class="box" id="invForm" autocomplete="off">
           <div class="add-bar-title"><h2 id="invFormTitle">Add device</h2></div>
@@ -605,6 +638,7 @@ const chains = {};
 function writeDoc(col, id, data) {
   const map = col === 'inventory' ? S.inv : S.loans;
   const body = { ...data }; delete body.id;
+  if (!S.ready) { toast('Still loading your data. Try again in a moment.', 'bad'); return Promise.resolve(false); }
   if (S.mode === 'github') return ghQueue(col, id, body);
   if (S.mode !== 'db') { map.set(id, { ...body, id }); saveLocal(); renderAll(); return Promise.resolve(true); }
   const key = col + '/' + id;
@@ -689,7 +723,7 @@ function setView(v, push = true) {
 document.querySelector('.tabs').addEventListener('click', e => { const b = e.target.closest('button[data-view]'); if (b) setView(b.dataset.view); });
 
 /* ---------- render ---------- */
-function renderAll() { renderStats(); renderInventory(); renderPicker(); renderDraft(); renderSaved(); renderLoans(); renderDetail(); renderBadge(); }
+function renderAll() { renderStats(); renderFilters(); renderInventory(); renderPicker(); renderDraft(); renderSaved(); renderLoans(); renderDetail(); renderBadge(); }
 
 function renderStats() {
   const onLoan = onLoanMap();
@@ -716,17 +750,41 @@ function renderInventory() {
     return;
   }
   const q = S.invQuery.trim().toLowerCase();
+  const f = S.f;
   const onLoan = onLoanMap();
-  const rows = sortedInv().filter(i => !q || [i.name, i.category, i.serial, i.notes].some(x => (x || '').toLowerCase().includes(q)));
-  if (!rows.length) { box.innerHTML = `<div class="empty"><strong>No match</strong><span>Nothing in the inventory matches “${esc(S.invQuery)}”.</span></div>`; return; }
+  const fieldsOf = i => f.field === 'all' ? [i.name, i.category, i.serial, i.notes] : [i[f.field]];
+  const rows = sortedInv().filter(i => {
+    const ol = onLoan[i.id] || 0, av = (i.total || 0) - ol;
+    if (q && !fieldsOf(i).some(x => (x || '').toLowerCase().includes(q))) return false;
+    if (f.cat === '__none') { if (i.category) return false; }
+    else if (f.cat && (i.category || '') !== f.cat) return false;
+    if (f.avail === 'available' && av <= 0) return false;
+    if (f.avail === 'none' && av > 0) return false;
+    if (f.avail === 'onloan' && ol <= 0) return false;
+    return true;
+  });
+  const byName = (a, b) => (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base' });
+  const avOf = i => (i.total || 0) - (onLoan[i.id] || 0);
+  const sorters = {
+    name: byName,
+    category: (a, b) => (a.category || '￿').localeCompare(b.category || '￿') || byName(a, b),
+    available: (a, b) => avOf(b) - avOf(a) || byName(a, b),
+    stock: (a, b) => (b.total || 0) - (a.total || 0) || byName(a, b),
+    onloan: (a, b) => (onLoan[b.id] || 0) - (onLoan[a.id] || 0) || byName(a, b),
+  };
+  rows.sort(sorters[f.sort] || byName);
+  const filtering = !!(q || f.cat || f.avail);
+  $('#fCount').textContent = filtering ? `Showing ${rows.length} of ${S.inv.size} devices` : '';
+  if (!rows.length) { box.innerHTML = `<div class="empty"><strong>No match</strong><span>No devices match this search. Try other words or clear the filters.</span></div>`; return; }
   box.innerHTML = `<div class="table-wrap"><table>
-    <thead><tr><th>Device</th><th>Serial / asset</th><th class="ctr">In stock</th><th class="num">On loan</th><th class="num">Available</th><th></th></tr></thead>
+    <thead><tr><th>Device</th><th>Category</th><th>Serial / asset</th><th class="ctr">In stock</th><th class="num">On loan</th><th class="num">Available</th><th></th></tr></thead>
     <tbody>${rows.map(i => {
       const ol = onLoan[i.id] || 0, av = (i.total || 0) - ol;
-      if (S.pendingDel === i.id) return `<tr class="confirm"><td colspan="5"><b>Delete “${esc(i.name)}”?</b> This removes it from the inventory. Past loan records keep its name.</td>
+      if (S.pendingDel === i.id) return `<tr class="confirm"><td colspan="6"><b>Delete “${esc(i.name)}”?</b> This removes it from the inventory. Past loan records keep its name.</td>
         <td class="num"><div class="actions" style="justify-content:flex-end"><button class="btn small danger solid" data-act="del-yes" data-id="${i.id}">Delete</button><button class="btn small" data-act="del-no">Keep</button></div></td></tr>`;
       return `<tr>
-        <td><div class="dev-name">${esc(i.name)}</div>${i.category ? `<div class="dev-cat">${esc(i.category)}</div>` : ''}${i.notes ? `<div class="dev-cat">${esc(i.notes)}</div>` : ''}</td>
+        <td><div class="dev-name">${esc(i.name)}</div>${i.notes ? `<div class="dev-cat">${esc(i.notes)}</div>` : ''}</td>
+        <td>${i.category ? `<button type="button" class="cat-link" data-act="cat" data-cat="${esc(i.category)}" title="Show only ${esc(i.category)}">${esc(i.category)}</button>` : '<span class="muted">–</span>'}</td>
         <td>${i.serial ? `<span class="serial">${esc(i.serial)}</span>` : '<span class="muted">–</span>'}</td>
         <td class="ctr"><div class="stepper">
           <button class="icon" data-act="dec" data-id="${i.id}" aria-label="One less ${esc(i.name)}" ${(i.total || 0) <= ol ? 'disabled' : ''}>−</button>
@@ -757,6 +815,7 @@ $('#invTable').addEventListener('click', e => {
     case 'inc': setTotal(id, (it.total || 0) + 1); break;
     case 'dec': setTotal(id, (it.total || 0) - 1); break;
     case 'edit': startEdit(id); break;
+    case 'cat': filterByCategory(b.dataset.cat); break;
     case 'del': S.pendingDel = id; renderInventory(); break;
     case 'del-no': S.pendingDel = null; renderInventory(); break;
     case 'del-yes': S.pendingDel = null; deleteDoc('inventory', id).then(ok => ok && toast('Device deleted')); if (S.editingId === id) resetInvForm(); break;
@@ -764,6 +823,36 @@ $('#invTable').addEventListener('click', e => {
 });
 $('#invTable').addEventListener('change', e => { const i = e.target.closest('input[data-act="total"]'); if (i) setTotal(i.dataset.id, i.value); });
 $('#invSearch').addEventListener('input', e => { S.invQuery = e.target.value; renderInventory(); });
+
+/* ---------- advanced search ---------- */
+S.f = { cat: '', avail: '', field: 'all', sort: 'name' };
+function renderFilters() {
+  const sel = $('#fCat'), cur = S.f.cat;
+  const cats = [...new Set([...S.inv.values()].map(i => i.category).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+  const hasNone = [...S.inv.values()].some(i => !i.category);
+  sel.innerHTML = `<option value="">All categories</option>` + cats.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('') + (hasNone ? `<option value="__none">No category</option>` : '');
+  sel.value = (cur === '__none' && hasNone) || cats.includes(cur) ? cur : '';
+  if (sel.value !== cur) S.f.cat = sel.value;
+  const n = (S.f.cat ? 1 : 0) + (S.f.avail ? 1 : 0) + (S.f.field !== 'all' ? 1 : 0);
+  $('#advToggle').textContent = n ? `Advanced search (${n})` : 'Advanced search';
+}
+$('#advToggle').addEventListener('click', () => {
+  const p = $('#advPanel'); p.hidden = !p.hidden;
+  $('#advToggle').setAttribute('aria-expanded', String(!p.hidden));
+  if (!p.hidden) $('#fCat').focus();
+});
+for (const [id, key] of [['#fCat', 'cat'], ['#fAvail', 'avail'], ['#fField', 'field'], ['#fSort', 'sort']]) {
+  $(id).addEventListener('change', e => { S.f[key] = e.target.value; renderFilters(); renderInventory(); });
+}
+$('#fClear').addEventListener('click', () => {
+  S.f = { cat: '', avail: '', field: 'all', sort: 'name' }; S.invQuery = '';
+  $('#invSearch').value = ''; $('#fAvail').value = ''; $('#fField').value = 'all'; $('#fSort').value = 'name';
+  renderFilters(); renderInventory();
+});
+function filterByCategory(cat) {
+  S.f.cat = cat; $('#advPanel').hidden = false; $('#advToggle').setAttribute('aria-expanded', 'true');
+  renderFilters(); renderInventory();
+}
 
 function startEdit(id) {
   const it = S.inv.get(id); if (!it) return;
@@ -781,6 +870,7 @@ function resetInvForm() {
 $('#invCancel').addEventListener('click', resetInvForm);
 $('#invForm').addEventListener('submit', async e => {
   e.preventDefault();
+  if (!S.ready) { toast('Still loading your data. Try again in a moment.', 'bad'); return; }
   const name = $('#invName').value.trim();
   if (!name) { toast('Give the device a name.', 'bad'); return; }
   const total = Math.max(0, int($('#invTotal').value));
