@@ -151,6 +151,8 @@ th.sort-th{padding-block:5px;text-align:right}
 .adv{display:grid;grid-template-columns:repeat(3,minmax(0,1fr)) auto;gap:12px;align-items:end;padding:14px 18px;margin-top:-6px}
 @media (max-width:1100px){.adv{grid-template-columns:repeat(2,minmax(0,1fr))}.adv-actions{grid-column:1/-1}}
 @media (max-width:560px){.adv{grid-template-columns:minmax(0,1fr)}}
+.email-add{margin-top:8px;flex-wrap:nowrap}
+.email-add input{max-width:280px}
 .label-row{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
 .link-btn{border:0;background:none;padding:0;color:var(--focus);font-size:.84rem;font-weight:500;cursor:pointer;text-decoration:underline;text-underline-offset:2px}
 .link-btn:hover{text-decoration-thickness:2px}
@@ -332,7 +334,7 @@ tr.confirm td{background:var(--bad-soft)}
                 <div class="field"><label for="lnStart">Start date</label><input type="date" id="lnStart" required></div>
                 <div class="field"><label for="lnEnd">End date (return by)</label><input type="date" id="lnEnd" required></div>
               </div>
-              <div class="field"><label for="lnContact">Contact (email or phone)</label><input type="text" id="lnContact" placeholder="Optional, not printed on the record"></div>
+              <div class="field"><label for="lnContact">Contact (email or phone)</label><input type="text" id="lnContact" placeholder="e.g. firstname.lastname@edu.karelia.fi"><span class="hint">Not printed. An email address here lets you email the loan record to the borrower.</span></div>
               <div class="field"><label for="lnNotes">Notes</label><textarea id="lnNotes" rows="2" placeholder="Optional, not printed on the record"></textarea></div>
             </div>
           </div>
@@ -1058,15 +1060,21 @@ $('#loanForm').addEventListener('submit', async e => {
 function renderSaved() {
   const box = $('#savedBox'), l = S.lastSaved;
   if (!l) { box.innerHTML = ''; return; }
+  const cur = S.loans.get(l.id) || l, to = emailIn(cur.contact);
   box.innerHTML = `<div class="saved"><p><b>Loan saved for ${esc(l.names)}.</b> Ref <span class="serial">${esc(l.ref)}</span> · ${l.items.reduce((a, i) => a + i.qty, 0)} unit(s), due back ${fmtDate(l.endDate)}.</p>
     <div class="actions"><button class="btn primary" data-exp="pdf">Download PDF</button><button class="btn" data-exp="xlsx">Download Excel</button>
-    <button class="btn" data-exp="open">Open in Loans</button><button class="btn" data-exp="close">Dismiss</button></div></div>`;
+    <button class="btn" data-exp="print">Print</button>
+    <button class="btn" data-exp="email" ${to ? `title="Send the Excel record to ${esc(to)}"` : 'disabled title="No email address in the Contact field"'}>Email to borrower</button>
+    <button class="btn" data-exp="open">Open in Loans</button><button class="btn" data-exp="close">Dismiss</button></div>
+    ${to ? '' : '<p class="sheet-note">To email the record, add the borrower’s email in Loans.</p>'}</div>`;
 }
 $('#savedBox').addEventListener('click', e => {
   const b = e.target.closest('[data-exp]'); if (!b || !S.lastSaved) return;
   const l = S.loans.get(S.lastSaved.id) || S.lastSaved;
   if (b.dataset.exp === 'pdf') exportPdf(l);
   if (b.dataset.exp === 'xlsx') exportXlsx(l);
+  if (b.dataset.exp === 'print') printLoan(l);
+  if (b.dataset.exp === 'email') emailLoan(l);
   if (b.dataset.exp === 'open') { S.openLoan = l.id; S.retDraft = null; S.loanFilter = 'open'; setView('loans'); renderAll(); }
   if (b.dataset.exp === 'close') { S.lastSaved = null; renderSaved(); }
 });
@@ -1144,7 +1152,9 @@ function renderDetail() {
       ${l.contact ? `<dt>Contact</dt><dd>${esc(l.contact)}</dd>` : ''}
       ${l.notes ? `<dt>Notes</dt><dd>${esc(l.notes)}</dd>` : ''}
     </dl>
-    <div class="actions" style="margin-top:12px"><button class="btn small" data-d="pdf">Download PDF</button><button class="btn small" data-d="xlsx">Download Excel</button></div>
+    <div class="actions" style="margin-top:12px"><button class="btn small" data-d="pdf">Download PDF</button><button class="btn small" data-d="xlsx">Download Excel</button><button class="btn small" data-d="print">Print</button>
+      ${emailIn(l.contact) ? `<button class="btn small primary" data-d="email" title="Send the Excel record to ${esc(emailIn(l.contact))}">Email to borrower</button>` : `<button class="btn small" data-d="addemail">Add email</button>`}</div>
+    ${S.addingEmail === l.id ? `<div class="actions email-add"><input type="email" id="loanEmailInput" placeholder="borrower@edu.karelia.fi" aria-label="Borrower email"><button class="btn small primary" data-d="saveemail">Save</button><button class="btn small" data-d="cancelemail">Cancel</button></div>` : ''}
     <hr class="divider">
     <h3 style="margin-bottom:6px">Return check</h3>
     <p class="sheet-note" style="margin:0 0 8px">Enter how many of each item came back. Rows still missing something are marked on the left.</p>
@@ -1176,6 +1186,12 @@ $('#loanDetail').addEventListener('change', e => {
   const inp = e.target.closest('[data-ri]');
   if (inp) { const i = +inp.dataset.ri; rd.qty[i] = Math.min(l.items[i].qty, Math.max(0, int(inp.value))); renderDetail(); }
 });
+$('#loanDetail').addEventListener('keydown', async e => {
+  if (e.target.id !== 'loanEmailInput') return;
+  const l = S.loans.get(S.openLoan); if (!l) return;
+  if (e.key === 'Enter') { e.preventDefault(); if (await saveLoanEmail(l, e.target.value)) { S.addingEmail = null; renderDetail(); toast('Email address saved'); } }
+  if (e.key === 'Escape') { S.addingEmail = null; renderDetail(); }
+});
 $('#loanDetail').addEventListener('click', async e => {
   const l = S.loans.get(S.openLoan); if (!l) return; const rd = getRetDraft(l);
   const all = e.target.closest('[data-all]');
@@ -1184,6 +1200,14 @@ $('#loanDetail').addEventListener('click', async e => {
   switch (b.dataset.d) {
     case 'pdf': exportPdf(l); break;
     case 'xlsx': exportXlsx(l); break;
+    case 'print': printLoan(l); break;
+    case 'email': emailLoan(l); break;
+    case 'addemail': S.addingEmail = l.id; renderDetail(); { const i = $('#loanEmailInput'); if (i) i.focus(); } break;
+    case 'cancelemail': S.addingEmail = null; renderDetail(); break;
+    case 'saveemail': {
+      if (await saveLoanEmail(l, $('#loanEmailInput').value)) { S.addingEmail = null; renderDetail(); renderSaved(); toast('Email address saved'); }
+      break;
+    }
     case 'markall': rd.qty = l.items.map(i => i.qty); renderDetail(); break;
     case 'save': {
       const items = l.items.map((it, i) => ({ ...it, returnedQty: rd.qty[i] }));
@@ -1267,16 +1291,74 @@ function drawLoanPage(doc, l, rows, offset, page, pages) {
   doc.setFontSize(8); doc.setTextColor(120);
   doc.text(`Loan ref ${l.ref || ''}${pages > 1 ? `  ·  page ${page + 1} of ${pages}` : ''}`, L, sigEnd + 14);
 }
-async function exportPdf(l) {
-  if (!window.jspdf) { toast('The PDF tool did not load. Reload the page and try again.', 'bad'); return; }
+function buildPdf(l) {
+  if (!window.jspdf) { toast('The PDF tool did not load. Reload the page and try again.', 'bad'); return null; }
   const doc = new window.jspdf.jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
   doc.setProperties({ title: 'ICT Laboratory Equipment Loan Record - ' + (l.names || '') });
   const items = l.items || [], pages = Math.max(1, Math.ceil(items.length / 10));
   for (let p = 0; p < pages; p++) { if (p) doc.addPage(); drawLoanPage(doc, l, items.slice(p * 10, p * 10 + 10), p * 10, p, pages); }
+  return doc;
+}
+async function exportPdf(l) {
+  const doc = buildPdf(l); if (!doc) return;
   await offerFile(loanFileBase(l) + '.pdf', doc.output('blob'));
 }
 async function exportXlsx(l) {
-  if (!window.ExcelJS) { toast('The Excel tool did not load. Reload the page and try again.', 'bad'); return; }
+  const blob = await buildXlsx(l); if (!blob) return;
+  await offerFile(loanFileBase(l) + '.xlsx', blob);
+}
+
+/* Print: open the loan record PDF with the print dialog set to appear. */
+function printLoan(l) {
+  const doc = buildPdf(l); if (!doc) return;
+  doc.autoPrint();
+  const url = URL.createObjectURL(doc.output('blob'));
+  const w = window.open(url, '_blank');
+  if (!w) { toast('Your browser blocked the print window. Allow pop-ups for this site, or download the PDF and print it.', 'bad'); return; }
+  toast('Opening the loan record for printing…');
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
+}
+
+/* Email: download the Excel record and open the email app with the message filled in.
+   A web page cannot attach files to an email by itself, so the file is attached by hand. */
+const emailIn = s => (String(s || '').match(/[^\s@,;:<>()"']+@[^\s@,;:<>()"']+\.[a-z]{2,}/i) || [])[0] || '';
+function loanEmailBody(l) {
+  const lines = [
+    `Hello ${l.names},`, '',
+    'Here is the record of the ICT Laboratory equipment you have borrowed.', '',
+    `Loan reference: ${l.ref || ''}`,
+    `Start date: ${fmtDate(l.startDate)}`,
+    `Return by: ${fmtDate(l.endDate)}`, '',
+    'Equipment:',
+    ...(l.items || []).map((it, i) => `${i + 1}. ${it.name} – ${it.qty} pcs${it.serial ? ` (serial ${it.serial})` : ''}`), '',
+    'The loan record is attached as an Excel file.',
+    `Please return all equipment to the ICT Laboratory by ${fmtDate(l.endDate)}.`, '',
+    'Best regards,', 'ICT Laboratory',
+  ];
+  return lines.join('\r\n');
+}
+async function emailLoan(l) {
+  const to = emailIn(l.contact);
+  if (!to) { toast('This loan has no email address. Add one first.', 'bad'); return; }
+  const blob = await buildXlsx(l); if (!blob) return;
+  const filename = loanFileBase(l) + '.xlsx';
+  await offerFile(filename, blob);
+  const subject = `ICT Laboratory equipment loan ${l.ref || ''}`.trim();
+  const href = `mailto:${encodeURIComponent(to).replace('%40', '@')}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(loanEmailBody(l))}`;
+  setTimeout(() => {
+    const a = document.createElement('a'); a.href = href; document.body.appendChild(a); a.click(); a.remove();
+    toast(`Email to ${to} opened. Attach “${filename}” from your Downloads folder, then send.`);
+  }, 400);
+}
+async function saveLoanEmail(l, raw) {
+  const addr = emailIn(raw);
+  if (!addr) { toast('That does not look like an email address.', 'bad'); return false; }
+  const contact = l.contact && !emailIn(l.contact) ? `${addr}, ${l.contact}` : addr;
+  return writeDoc('loans', l.id, { ...l, contact });
+}
+
+async function buildXlsx(l) {
+  if (!window.ExcelJS) { toast('The Excel tool did not load. Reload the page and try again.', 'bad'); return null; }
   const wb = new ExcelJS.Workbook();
   const ws = wb.addWorksheet('Loan Record', { pageSetup: { paperSize: 9, orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0,
     margins: { left: 0.3, right: 0.3, top: 0.9, bottom: 0.5, header: 0.3, footer: 0.3 } } });
@@ -1308,7 +1390,7 @@ async function exportXlsx(l) {
   addRow(['', '', 'Signature', ''], { bold: [0, 0, 1], align: [0, 0, right] });
   const ref = ws.getCell(r + 1, 1); ref.value = `Loan ref ${l.ref || ''}`; ref.font = { name: 'Calibri', size: 9, color: { argb: 'FF7A7A7A' } };
   const buf = await wb.xlsx.writeBuffer();
-  await offerFile(loanFileBase(l) + '.xlsx', new Blob([buf]));
+  return new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
 }
 $('#invExport').addEventListener('click', async () => {
   if (!S.inv.size) { toast('The inventory is empty.', 'bad'); return; }
