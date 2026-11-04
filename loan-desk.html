@@ -786,7 +786,7 @@ function renderInventory() {
     mostStock: (a, b) => (b.total || 0) - (a.total || 0) || byName(a, b),
     mostLoan: (a, b) => (onLoan[b.id] || 0) - (onLoan[a.id] || 0) || byName(a, b),
   };
-  rows.sort(sorters[S.sort] || sorters.newest);
+  rows.sort(sorters[S.sort] || sorters.az);
   const filtering = !!(q || f.cat || f.avail);
   $('#fCount').textContent = filtering ? `Showing ${rows.length} of ${S.inv.size} devices` : '';
   // selection: forget devices that no longer exist
@@ -929,13 +929,13 @@ $('#invSearch').addEventListener('input', e => { S.invQuery = e.target.value; re
 
 /* ---------- advanced search ---------- */
 S.f = { cat: '', avail: '', field: 'all' };
-const SORT_KEY = 'ict-lab-loan-desk-sort-v2';
+const SORT_KEY = 'ict-lab-loan-desk-sort-v3';
 const SORT_OPTIONS = [
   ['newest', 'Newest added'], ['oldest', 'Oldest added'], ['modified', 'Recently modified'],
   ['az', 'Name A–Z'], ['za', 'Name Z–A'], ['category', 'Category A–Z'],
   ['mostAvail', 'Most available'], ['leastAvail', 'Least available'], ['mostStock', 'Most in stock'], ['mostLoan', 'Most on loan'],
 ];
-S.sort = 'newest';
+S.sort = 'az';
 try { const s = localStorage.getItem(SORT_KEY); if (s && SORT_OPTIONS.some(o => o[0] === s)) S.sort = s; } catch (e) {}
 $('#invTable').addEventListener('change', e => {
   if (e.target.id !== 'invSort') return;

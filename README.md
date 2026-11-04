@@ -14,7 +14,7 @@ It keeps track of the lab's devices, records who has borrowed what, produces the
 - See for every device how many are **in stock**, **on loan** and **available**.
 - **Search** by name, category, serial number or notes.
 - **Advanced search**: filter by category (including "No category"), by availability (available, none available, some on loan), and choose which field the search text looks in.
-- **Sort by**: newest added, oldest added, recently modified, name A–Z / Z–A, category, most / least available, most in stock, most on loan. The choice is remembered.
+- **Sort by** (default name A–Z): newest added, oldest added, recently modified, name A–Z / Z–A, category, most / least available, most in stock, most on loan. The choice is remembered.
 - **Manage categories**: rename or remove a category. All devices in it are updated. Renaming into an existing category merges the two.
 - Click a category in the table to show only that category.
 - **Bar above the table**:
