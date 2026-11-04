@@ -165,6 +165,9 @@ th.sort-th{padding-block:5px;text-align:right}
 tr.is-selected td{background:color-mix(in srgb,var(--accent) 13%,var(--surface))}
 .sel-bar{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;padding:9px 14px;background:var(--info-soft);border-bottom:1px solid var(--line);border-radius:4px 4px 0 0}
 .sel-bar.confirm{background:var(--bad-soft)}
+.sel-bar.idle{background:var(--surface)}
+.sel-bar .muted{font-size:.88rem}
+.sel-bar .btn svg{margin-right:1px}
 .email-add{margin-top:8px;flex-wrap:nowrap}
 .email-add input{max-width:280px}
 .label-row{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
@@ -287,7 +290,6 @@ tr.confirm td{background:var(--bad-soft)}
           <div class="toolbar">
             <input type="search" id="invSearch" placeholder="Search devices" aria-label="Search devices">
             <button class="btn" id="advToggle" type="button" aria-expanded="false" aria-controls="advPanel">Advanced search</button>
-            <button class="btn" id="invExport" type="button">Export to Excel</button>
           </div>
         </div>
         <div class="box adv" id="advPanel" hidden>
@@ -672,8 +674,11 @@ function goLocal(msg) {
   setSync('local'); renderAll();
 }
 async function startStorage() {
+  // The Claude viewer runs the page inside a frame; a normal website (GitHub Pages) does not, so it needn't wait.
+  let inFrame = false;
+  try { inFrame = window.self !== window.top; } catch (e) { inFrame = true; }
   let tries = 0;
-  while (!(window.claude && window.claude.use) && tries < 15) { await new Promise(r => setTimeout(r, 100)); tries++; }
+  while (inFrame && !(window.claude && window.claude.use) && tries < 15) { await new Promise(r => setTimeout(r, 100)); tries++; }
   if (!(window.claude && window.claude.use)) {
     const cfg = ghLoadCfg();
     if (!cfg) { goLocal(); return; }
@@ -827,8 +832,19 @@ function renderInventory() {
 
 /* ---------- select several devices ---------- */
 S.sel = new Set(); S.visibleInv = []; S.bulkDel = false;
+const ICON_BIN = '<svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 4h11M6 4V2.5h4V4M4 4l.7 9.5h6.6L12 4M6.6 6.5v4.5M9.4 6.5v4.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+const ICON_X = '<svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>';
+const ICON_XLS = '<svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2v8M4.5 6.5L8 10l3.5-3.5M2.5 13.5h11" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 function selectionBar(onLoan) {
-  const n = S.sel.size; if (!n) { S.bulkDel = false; return ''; }
+  const n = S.sel.size;
+  if (!n) S.bulkDel = false;
+  const shown = S.visibleInv.length;
+  const allShownSelected = shown > 0 && S.visibleInv.every(id => S.sel.has(id));
+  if (!n) {
+    return `<div class="sel-bar idle" role="region" aria-label="Selection">
+      <div class="actions"><button class="btn small" type="button" data-bulk="all" ${shown ? '' : 'disabled'}>Select all</button><span class="muted">Tick devices to export or delete several at once.</span></div>
+      <div class="actions"><button class="btn small" type="button" data-bulk="export" ${shown ? '' : 'disabled'} title="Export every device shown in the list">${ICON_XLS}Export to Excel</button></div></div>`;
+  }
   const hidden = [...S.sel].filter(id => !S.visibleInv.includes(id)).length;
   const loaned = [...S.sel].filter(id => (onLoan[id] || 0) > 0).length;
   const dev = k => `${k} device${k === 1 ? '' : 's'}`;
@@ -840,11 +856,14 @@ function selectionBar(onLoan) {
       <div class="actions">${del ? `<button class="btn small danger solid" type="button" data-bulk="del-yes">Delete ${dev(del)}</button>` : ''}<button class="btn small" type="button" data-bulk="del-no">Cancel</button></div></div>`;
   }
   return `<div class="sel-bar" role="region" aria-label="Selected devices">
-    <span><b>${n} selected</b>${hidden ? ` <span class="muted">(${hidden} hidden by the current search)</span>` : ''}</span>
     <div class="actions">
-      <button class="btn small" type="button" data-bulk="export">Export selected to Excel</button>
-      <button class="btn small danger" type="button" data-bulk="del">Delete selected</button>
-      <button class="btn small" type="button" data-bulk="clear">Clear selection</button>
+      <button class="btn small" type="button" data-bulk="${allShownSelected ? 'none' : 'all'}" ${shown ? '' : 'disabled'}>${allShownSelected ? 'Deselect all' : 'Select all'}</button>
+      <span><b>${n} selected</b>${hidden ? ` <span class="muted">(${hidden} hidden by the current search)</span>` : ''}</span>
+    </div>
+    <div class="actions">
+      <button class="btn small" type="button" data-bulk="export" title="Export the ${n} selected device${n === 1 ? '' : 's'}">${ICON_XLS}Export to Excel</button>
+      <button class="btn small danger" type="button" data-bulk="del" title="Delete the selected devices" aria-label="Delete selected devices">${ICON_BIN}Delete</button>
+      <button class="btn small" type="button" data-bulk="clear" title="Clear the selection" aria-label="Clear selection">${ICON_X}Clear</button>
     </div></div>`;
 }
 $('#invTable').addEventListener('change', e => {
@@ -856,9 +875,18 @@ $('#invTable').addEventListener('click', async e => {
   const b = e.target.closest('[data-bulk]'); if (!b) return;
   switch (b.dataset.bulk) {
     case 'clear': S.sel.clear(); S.bulkDel = false; renderInventory(); break;
+    case 'all': for (const id of S.visibleInv) S.sel.add(id); S.bulkDel = false; renderInventory(); break;
+    case 'none': for (const id of S.visibleInv) S.sel.delete(id); S.bulkDel = false; renderInventory(); break;
     case 'export': {
-      const items = sortedInv().filter(i => S.sel.has(i.id));
-      await exportInventory(items, `ICT lab inventory - ${items.length} selected - ${todayISO()}.xlsx`);
+      if (S.sel.size) {
+        const items = sortedInv().filter(i => S.sel.has(i.id));
+        await exportInventory(items, `ICT lab inventory - ${items.length} selected - ${todayISO()}.xlsx`);
+      } else {
+        const order = new Map(S.visibleInv.map((id, k) => [id, k]));
+        const items = [...S.inv.values()].filter(i => order.has(i.id)).sort((a, b) => order.get(a.id) - order.get(b.id));
+        const filtered = items.length < S.inv.size;
+        await exportInventory(items, `ICT lab inventory${filtered ? ` - ${items.length} shown` : ''} ${todayISO()}.xlsx`);
+      }
       break;
     }
     case 'del': S.bulkDel = true; renderInventory(); break;
@@ -1466,10 +1494,6 @@ async function buildXlsx(l) {
   const buf = await wb.xlsx.writeBuffer();
   return new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
 }
-$('#invExport').addEventListener('click', async () => {
-  if (!S.inv.size) { toast('The inventory is empty.', 'bad'); return; }
-  await exportInventory(sortedInv(), `ICT lab inventory ${todayISO()}.xlsx`);
-});
 async function exportInventory(items, filename) {
   if (!items.length) { toast('Nothing to export.', 'bad'); return; }
   if (!window.ExcelJS) { toast('The Excel tool did not load. Reload the page and try again.', 'bad'); return; }
