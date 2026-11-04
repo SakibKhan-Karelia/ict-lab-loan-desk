@@ -166,6 +166,7 @@ tr.is-selected td{background:color-mix(in srgb,var(--accent) 13%,var(--surface))
 .sel-bar{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;padding:9px 14px;background:var(--info-soft);border-bottom:1px solid var(--line);border-radius:4px 4px 0 0}
 .sel-bar.confirm{background:var(--bad-soft)}
 .sel-bar.idle{background:var(--surface)}
+.visually-hidden{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 .sel-bar .muted{font-size:.88rem}
 .sel-bar .btn svg{margin-right:1px}
 .email-add{margin-top:8px;flex-wrap:nowrap}
@@ -350,7 +351,7 @@ tr.confirm td{background:var(--bad-soft)}
                 <div class="field"><label for="lnStart">Start date</label><input type="date" id="lnStart" required></div>
                 <div class="field"><label for="lnEnd">End date (return by)</label><input type="date" id="lnEnd" required></div>
               </div>
-              <div class="field"><label for="lnContact">Contact (email or phone)</label><input type="text" id="lnContact" placeholder="e.g. firstname.lastname@edu.karelia.fi"><span class="hint">Not printed. An email address here lets you email the loan record to the borrower.</span></div>
+              <div class="field"><label for="lnContact">Contact (email or phone)</label><input type="text" id="lnContact" placeholder="e.g. firstname.lastname@edu.karelia.fi"></div>
               <div class="field"><label for="lnNotes">Notes</label><textarea id="lnNotes" rows="2" placeholder="Optional, not printed on the record"></textarea></div>
             </div>
           </div>
@@ -804,15 +805,15 @@ function renderInventory() {
   if (!rows.length) { box.innerHTML = bar + `<div class="empty"><strong>No match</strong><span>No devices match this search. Try other words or clear the filters.</span></div>`; return; }
   const shownSel = rows.filter(i => S.sel.has(i.id)).length;
   box.innerHTML = bar + `<div class="table-wrap"><table>
-    <thead><tr><th class="sel-td"><input type="checkbox" id="selAll" aria-label="Select all shown devices" ${shownSel && shownSel === rows.length ? 'checked' : ''}></th><th>Device</th><th>Category</th><th>Serial / asset</th><th class="ctr">In stock</th><th class="num">On loan</th><th class="num">Available</th>
+    <thead><tr>${S.selMode ? '<th class="sel-td"><span class="visually-hidden">Select</span></th>' : ''}<th>Device</th><th>Category</th><th>Serial / asset</th><th class="ctr">In stock</th><th class="num">On loan</th><th class="num">Available</th>
       <th class="sort-th"><label class="sort-by">Sort by <select id="invSort">${SORT_OPTIONS.map(([v, t]) => `<option value="${v}"${v === S.sort ? ' selected' : ''}>${t}</option>`).join('')}</select></label></th></tr></thead>
     <tbody>${rows.map(i => {
       const ol = onLoan[i.id] || 0, av = (i.total || 0) - ol;
-      if (S.pendingDel === i.id) return `<tr class="confirm"><td colspan="7"><b>Delete “${esc(i.name)}”?</b> This removes it from the inventory. Past loan records keep its name.</td>
+      if (S.pendingDel === i.id) return `<tr class="confirm"><td colspan="${S.selMode ? 7 : 6}"><b>Delete “${esc(i.name)}”?</b> This removes it from the inventory. Past loan records keep its name.</td>
         <td class="num"><div class="actions" style="justify-content:flex-end"><button class="btn small danger solid" data-act="del-yes" data-id="${i.id}">Delete</button><button class="btn small" data-act="del-no">Keep</button></div></td></tr>`;
       const picked = S.sel.has(i.id);
       return `<tr class="${picked ? 'is-selected' : ''}">
-        <td class="sel-td"><input type="checkbox" data-sel="${i.id}" ${picked ? 'checked' : ''} aria-label="Select ${esc(i.name)}"></td>
+        ${S.selMode ? `<td class="sel-td"><input type="checkbox" data-sel="${i.id}" ${picked ? 'checked' : ''} aria-label="Select ${esc(i.name)}"></td>` : ''}
         <td><div class="dev-name">${esc(i.name)}</div>${i.notes ? `<div class="dev-cat">${esc(i.notes)}</div>` : ''}</td>
         <td>${i.category ? `<button type="button" class="cat-link" data-act="cat" data-cat="${esc(i.category)}" title="Show only ${esc(i.category)}">${esc(i.category)}</button>` : '<span class="muted">–</span>'}</td>
         <td>${i.serial ? `<span class="serial">${esc(i.serial)}</span>` : '<span class="muted">–</span>'}</td>
@@ -831,7 +832,7 @@ function renderInventory() {
 }
 
 /* ---------- select several devices ---------- */
-S.sel = new Set(); S.visibleInv = []; S.bulkDel = false;
+S.sel = new Set(); S.visibleInv = []; S.bulkDel = false; S.selMode = false;
 const ICON_BIN = '<svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 4h11M6 4V2.5h4V4M4 4l.7 9.5h6.6L12 4M6.6 6.5v4.5M9.4 6.5v4.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 const ICON_X = '<svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>';
 const ICON_XLS = '<svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2v8M4.5 6.5L8 10l3.5-3.5M2.5 13.5h11" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
@@ -840,10 +841,13 @@ function selectionBar(onLoan) {
   if (!n) S.bulkDel = false;
   const shown = S.visibleInv.length;
   const allShownSelected = shown > 0 && S.visibleInv.every(id => S.sel.has(id));
-  if (!n) {
+  const exportBtn = n
+    ? `<button class="btn small" type="button" data-bulk="export" title="Export the ${n} selected device${n === 1 ? '' : 's'}">${ICON_XLS}Export to Excel</button>`
+    : `<button class="btn small" type="button" data-bulk="export" ${shown ? '' : 'disabled'} title="Export every device shown in the list">${ICON_XLS}Export to Excel</button>`;
+  if (!S.selMode) {
     return `<div class="sel-bar idle" role="region" aria-label="Selection">
-      <div class="actions"><button class="btn small" type="button" data-bulk="all" ${shown ? '' : 'disabled'}>Select all</button><span class="muted">Tick devices to export or delete several at once.</span></div>
-      <div class="actions"><button class="btn small" type="button" data-bulk="export" ${shown ? '' : 'disabled'} title="Export every device shown in the list">${ICON_XLS}Export to Excel</button></div></div>`;
+      <div class="actions"><button class="btn small" type="button" data-bulk="select" ${shown ? '' : 'disabled'}>Select</button></div>
+      <div class="actions">${exportBtn}</div></div>`;
   }
   const hidden = [...S.sel].filter(id => !S.visibleInv.includes(id)).length;
   const loaned = [...S.sel].filter(id => (onLoan[id] || 0) > 0).length;
@@ -855,15 +859,15 @@ function selectionBar(onLoan) {
       ${loaned ? ` ${dev(loaned)} with units on loan will be kept.` : ''}</span>
       <div class="actions">${del ? `<button class="btn small danger solid" type="button" data-bulk="del-yes">Delete ${dev(del)}</button>` : ''}<button class="btn small" type="button" data-bulk="del-no">Cancel</button></div></div>`;
   }
+  const pickBtns = allShownSelected
+    ? `<button class="btn small" type="button" data-bulk="none">Deselect all</button>`
+    : `<button class="btn small" type="button" data-bulk="all" ${shown ? '' : 'disabled'}>Select all</button><button class="btn small" type="button" data-bulk="none">${ICON_X}Deselect</button>`;
   return `<div class="sel-bar" role="region" aria-label="Selected devices">
-    <div class="actions">
-      <button class="btn small" type="button" data-bulk="${allShownSelected ? 'none' : 'all'}" ${shown ? '' : 'disabled'}>${allShownSelected ? 'Deselect all' : 'Select all'}</button>
+    <div class="actions">${pickBtns}
       <span><b>${n} selected</b>${hidden ? ` <span class="muted">(${hidden} hidden by the current search)</span>` : ''}</span>
     </div>
-    <div class="actions">
-      <button class="btn small" type="button" data-bulk="export" title="Export the ${n} selected device${n === 1 ? '' : 's'}">${ICON_XLS}Export to Excel</button>
-      <button class="btn small danger" type="button" data-bulk="del" title="Delete the selected devices" aria-label="Delete selected devices">${ICON_BIN}Delete</button>
-      <button class="btn small" type="button" data-bulk="clear" title="Clear the selection" aria-label="Clear selection">${ICON_X}Clear</button>
+    <div class="actions">${exportBtn}
+      ${n ? `<button class="btn small danger" type="button" data-bulk="del" title="Delete the selected devices" aria-label="Delete selected devices">${ICON_BIN}Delete</button>` : ''}
     </div></div>`;
 }
 $('#invTable').addEventListener('change', e => {
@@ -874,9 +878,10 @@ $('#invTable').addEventListener('change', e => {
 $('#invTable').addEventListener('click', async e => {
   const b = e.target.closest('[data-bulk]'); if (!b) return;
   switch (b.dataset.bulk) {
-    case 'clear': S.sel.clear(); S.bulkDel = false; renderInventory(); break;
+    case 'select': S.selMode = true; renderInventory(); break;
     case 'all': for (const id of S.visibleInv) S.sel.add(id); S.bulkDel = false; renderInventory(); break;
-    case 'none': for (const id of S.visibleInv) S.sel.delete(id); S.bulkDel = false; renderInventory(); break;
+    case 'clear':
+    case 'none': S.sel.clear(); S.selMode = false; S.bulkDel = false; renderInventory(); break;
     case 'export': {
       if (S.sel.size) {
         const items = sortedInv().filter(i => S.sel.has(i.id));
@@ -897,6 +902,7 @@ $('#invTable').addEventListener('click', async e => {
       S.bulkDel = false;
       let done = 0;
       for (const id of del) { if (await deleteDoc('inventory', id)) { done++; S.sel.delete(id); } }
+      if (!S.sel.size) S.selMode = false;
       if (S.editingId && !S.inv.has(S.editingId)) resetInvForm();
       renderAll();
       toast(`Deleted ${done} device${done === 1 ? '' : 's'}` + (kept ? `. ${kept} kept because units are on loan.` : ''));
