@@ -17,6 +17,10 @@ It keeps track of the lab's devices, records who has borrowed what, produces the
 - **Sort by**: newest added, oldest added, recently modified, name A–Z / Z–A, category, most / least available, most in stock, most on loan. The choice is remembered.
 - **Manage categories**: rename or remove a category. All devices in it are updated. Renaming into an existing category merges the two.
 - Click a category in the table to show only that category.
+- **Select several devices** with the checkboxes (the box in the header selects everything shown). A bar above the table then offers:
+  - **Export selected to Excel**: only the selected devices.
+  - **Delete selected**: asks for confirmation first. Devices with units on loan are kept.
+  - **Clear selection**.
 - **Export to Excel**: the whole inventory as a spreadsheet.
 
 ### New loan
@@ -100,5 +104,6 @@ The app uses [jsPDF](https://github.com/parallax/jsPDF) for PDF files and [Excel
 
 New features are listed here, newest first.
 
+- **2026-11-04**: Select several devices to export or delete them together.
 - **2026-11-04**: Print and Email to borrower for loan records; Add email for older loans.
 - **2026-11-03**: Sort by dropdown; category manager (rename / remove); Category column and Advanced search; full-width layout with green sidebar and page header; Karelia logo and green theme; Light / Dark / Auto theme; storage in a private GitHub repository; first version with inventory, loans, return check and PDF / Excel export.
