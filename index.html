@@ -2048,8 +2048,12 @@ function histBar() {
   const n = S.histSel.size, shown = S.visibleHist.length;
   if (!n) S.histDel = false;
   const ent = k => `${k} entr${k === 1 ? 'y' : 'ies'}`;
+  const exportBtn = n
+    ? `<button class="btn small" type="button" data-hb="export" title="Export the ${n} selected entr${n === 1 ? 'y' : 'ies'}">${ICON_XLS}Export to Excel</button>`
+    : `<button class="btn small" type="button" data-hb="export" ${shown ? '' : 'disabled'} title="Export every entry that matches the search and filter">${ICON_XLS}Export to Excel</button>`;
   if (!S.histSelMode) return `<div class="sel-bar idle" role="region" aria-label="Selection">
-    <div class="actions"><button class="btn small" type="button" data-hb="select" ${shown ? '' : 'disabled'}>Select</button></div></div>`;
+    <div class="actions"><button class="btn small" type="button" data-hb="select" ${shown ? '' : 'disabled'}>Select</button></div>
+    <div class="actions">${exportBtn}</div></div>`;
   if (S.histDel) return `<div class="sel-bar confirm" role="region" aria-label="Confirm delete">
     <span><b>Delete ${ent(n)} from the history?</b> This can't be undone in the app.</span>
     <div class="actions"><button class="btn small danger solid" type="button" data-hb="del-yes">Delete ${ent(n)}</button><button class="btn small" type="button" data-hb="del-no">Cancel</button></div></div>`;
@@ -2060,7 +2064,7 @@ function histBar() {
       ? '<button class="btn small" type="button" data-hb="none">Deselect all</button>'
       : `<button class="btn small" type="button" data-hb="all" ${shown ? '' : 'disabled'} title="Select every entry that matches the search">Select all</button><button class="btn small" type="button" data-hb="none">${ICON_X}Deselect</button>`}
       <span><b>${n} selected</b>${hidden ? ` <span class="muted">(${hidden} hidden by the current search)</span>` : ''}</span></div>
-    <div class="actions">${n ? `<button class="btn small danger" type="button" data-hb="del" aria-label="Delete selected history entries">${ICON_BIN}Delete</button>` : ''}</div></div>`;
+    <div class="actions">${exportBtn}${n ? `<button class="btn small danger" type="button" data-hb="del" aria-label="Delete selected history entries">${ICON_BIN}Delete</button>` : ''}</div></div>`;
 }
 function renderHistory() {
   const box = $('#histTable'); if (!box) return;
@@ -2075,12 +2079,30 @@ function renderHistory() {
   if (!rows.length) { box.innerHTML = histBar() + `<div class="empty"><strong>No matching changes</strong><span>Try another search or type.</span></div>`; return; }
   const shown = rows.slice(0, S.histLimit), sel = S.histSelMode;
   box.innerHTML = histBar() + `<div class="table-wrap"><table>
-    <thead><tr>${sel ? '<th class="sel-td"><span class="visually-hidden">Select</span></th>' : ''}<th>When</th><th>Who</th><th>Change</th><th>Details</th></tr></thead>
+    <thead><tr>${sel ? '<th class="sel-td"><span class="visually-hidden">Select</span></th>' : ''}<th>Timestamp</th><th>User</th><th>Action</th><th>Description</th></tr></thead>
     <tbody>${shown.map(h => `<tr class="${sel && S.histSel.has(h.id) ? 'is-selected' : ''}">${sel ? `<td class="sel-td"><input type="checkbox" data-hsel="${h.id}" ${S.histSel.has(h.id) ? 'checked' : ''} aria-label="Select ${esc(h.action || 'entry')} ${esc(fmtWhen(h.at))}"></td>` : ''}
       <td class="hist-when">${esc(fmtWhen(h.at))}</td><td class="hist-who">${h.by ? esc(h.by) : '<span class="muted">–</span>'}</td>
       <td class="hist-act">${esc(h.action || '')}</td><td>${esc(h.text || '')}</td></tr>`).join('')}</tbody></table></div>
     <div class="hist-more"><span class="sheet-note">Showing ${shown.length} of ${rows.length} change${rows.length === 1 ? '' : 's'}. ${where}</span>
     ${rows.length > shown.length ? '<button class="btn small" type="button" id="histMore">Show more</button>' : ''}</div>`;
+}
+const HIST_TYPE = { inventory: 'Inventory', loan: 'Loan', borrowers: 'Borrowers', people: 'Borrowers' };
+async function exportHistory(entries) {
+  if (!entries.length) { toast('Nothing to export.', 'bad'); return; }
+  if (!window.ExcelJS) { toast('The Excel tool did not load. Reload the page and try again.', 'bad'); return; }
+  const wb = new ExcelJS.Workbook(), ws = wb.addWorksheet('Change history'); // 'History' is reserved in Excel
+  ws.columns = [{ header: 'Timestamp', width: 18 }, { header: 'User', width: 22 }, { header: 'Category', width: 12 }, { header: 'Action', width: 20 }, { header: 'Description', width: 80 }];
+  ws.getRow(1).font = { bold: true };
+  for (const h of entries) {
+    const d = new Date(h.at);
+    const row = ws.addRow([isNaN(d) ? (h.at || '') : new Date(d.getTime() - d.getTimezoneOffset() * 60000), h.by || '', HIST_TYPE[h.type] || h.type || '', h.action || '', h.text || '']);
+    row.getCell(1).numFmt = 'd.m.yyyy hh:mm';
+    row.getCell(5).alignment = { wrapText: true, vertical: 'top' };
+  }
+  ws.views = [{ state: 'frozen', ySplit: 1 }];
+  ws.autoFilter = { from: 'A1', to: 'E1' };
+  const buf = await wb.xlsx.writeBuffer();
+  await offerFile(`ICT Lab history ${todayISO()}.xlsx`, new Blob([buf]));
 }
 $('#histTable').addEventListener('change', e => {
   const t = e.target; if (!t.matches('input[data-hsel]')) return;
@@ -2090,6 +2112,11 @@ $('#histTable').addEventListener('click', e => {
   const b = e.target.closest('[data-hb]'); if (!b) return;
   switch (b.dataset.hb) {
     case 'select': S.histSelMode = true; break;
+    case 'export': {
+      const ids = S.histSel.size ? S.visibleHist.filter(id => S.histSel.has(id)).concat([...S.histSel].filter(id => !S.visibleHist.includes(id))) : S.visibleHist;
+      exportHistory(ids.map(id => S.hist.get(id)).filter(Boolean));
+      return;
+    }
     case 'all': for (const id of S.visibleHist) S.histSel.add(id); break;
     case 'none': S.histSel.clear(); S.histSelMode = false; S.histDel = false; break;
     case 'del': S.histDel = true; break;
