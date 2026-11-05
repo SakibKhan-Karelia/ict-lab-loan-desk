@@ -2235,7 +2235,7 @@ function groupList() {
   const note = g => { g = (g || '').trim(); if (!g) return null; const k = g.toUpperCase(); if (!extra.has(k)) extra.set(k, g); return k; };
   for (const l of S.loans.values()) { const k = note(l.group); if (k) used[k] = (used[k] || 0) + 1; }
   for (const b of S.borrowers.values()) note(b.group);
-  for (const g of GROUPS) extra.delete(g);
+  for (const g of GROUPS) extra.delete(g.toUpperCase());
   return [...GROUPS.map(g => ({ text: g })), ...[...extra.values()].map(g => ({ text: g, earlier: true }))]
     .map(g => ({ ...g, used: used[g.text.toUpperCase()] || 0 }));
 }
