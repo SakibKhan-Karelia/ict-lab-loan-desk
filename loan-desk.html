@@ -406,7 +406,7 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
         <div id="savedBox"></div>
         <form id="loanForm" autocomplete="off" class="loan-grid">
           <div class="box">
-            <div class="box-head"><h2>Borrower</h2><div class="actions"><span class="sheet-note" id="dirInfo"></span><button type="button" class="link-btn" id="dirImport" title="Import a student / staff list (Excel or CSV, e.g. from Moodle) for name and email suggestions">Import student list</button><input type="file" id="dirFile" accept=".xlsx,.csv,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden></div></div>
+            <div class="box-head"><h2>Borrower</h2><div class="actions"><span class="sheet-note" id="dirInfo"></span></div></div>
             <div class="box-pad form">
               <div class="field"><label for="lnNames">Name(s)</label><input type="text" id="lnNames" required placeholder="Borrower name(s), separated by commas"></div>
               <div class="row2">
@@ -2316,8 +2316,6 @@ async function importDirectory(file) {
     toast(`Imported ${list.length} people (${added} new). Their names and emails are now suggested.`);
   }
 }
-$('#dirImport').addEventListener('click', () => $('#dirFile').click());
-$('#dirFile').addEventListener('change', e => { const f = e.target.files[0]; e.target.value = ''; if (f) importDirectory(f); });
 function renderDirInfo() {
   const n = S.borrowers.size; $('#dirInfo').textContent = n ? `${n} people in the borrower list` : '';
 }

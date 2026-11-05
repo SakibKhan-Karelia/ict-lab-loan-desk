@@ -25,8 +25,7 @@ It keeps track of the lab's devices, records who has borrowed what, produces the
 
 ### New loan
 - Fields follow the paper form: Name(s), Group, Course, Start date, End date, plus Contact and Notes (not printed).
-- **Name and email suggestions**: start typing a name, an email or a student number. Matching people are listed: those who borrowed before first (marked "borrowed 2×" and so on), then everyone else on the borrower list. Use the mouse, or ↓ / ↑ and Enter. Picking one fills in the name and email, and the group and course if they are empty.
-- **Import student list** (top of the Borrower box): choose an Excel file (.xlsx) or a CSV with "Full name" (or "First name" and "Last name"), "Email address" and optionally "Username" columns, for example a Moodle completion progress or participants export. In an Excel file the first sheet with those columns is used. Everyone in it is added to the suggestions. Import again whenever there are new students; people already on the list are updated, nobody is removed. System accounts are skipped, and if someone appears twice (a private and a school email) the school email is kept.
+- **Name and email suggestions**: start typing a name, an email or a student number. Matching people are listed: those who borrowed before first (marked "borrowed 2×" and so on), then everyone else on the borrower list. To add many people at once, add them to `borrowers.json` in the data repository. Use the mouse, or ↓ / ↑ and Enter. Picking one fills in the name and email, and the group and course if they are empty.
 - **New borrowers are added automatically**: when a loan is saved for a name or email that is not on the borrower list yet, that person is added (marked as "added"). For people already on the list, the latest group, course and contact are kept.
 - **Remove someone from the borrower list**: press the **×** next to a name in the suggestions (or highlight it with ↓ / ↑ and press Delete), then **Remove**. Their loans are kept; the removal is listed on the History page. Importing a list again brings them back if they are in it.
 - **Group suggestions**: click the Group box to see ICNS23, ICNS24, ICNS25, ICNS26 and TITE/ICT Program Team, or type to filter. Other groups typed in earlier loans are suggested too.
@@ -72,7 +71,7 @@ Each change is one commit that only touches the files it changed:
 | --- | --- |
 | `inventory.json` | Devices and components, one per line, A–Z. |
 | `loans.json` | Loan records, newest first, one per line. |
-| `borrowers.json` | Students and staff: everyone imported with **Import student list** (`"source":"imported"`) and everyone typed into a loan who wasn't on the list (`"source":"added"`). Name, email, username, group, course. Used for the suggestions in New loan. |
+| `borrowers.json` | Students and staff: the imported student and staff list (`"source":"imported"`) and everyone typed into a loan who wasn't on the list (`"source":"added"`). Name, email, username, group, course. Used for the suggestions in New loan. |
 | `history.json` | Every change, newest first, one line per change (date, who, what). This is what the History page shows. |
 
 The files are created automatically when first needed.
@@ -151,6 +150,7 @@ The app uses [jsPDF](https://github.com/parallax/jsPDF) for PDF files and [Excel
 
 New features are listed here, newest first.
 
+- **2026-11-05**: Removed the Import student list button (the borrower list is kept).
 - **2026-11-05**: TITE/ICT Program Team added to the group suggestions; its members added to the borrower list.
 - **2026-11-05**: Group suggestions (ICNS23–ICNS26); × in the name suggestions to remove someone from the borrower list.
 - **2026-11-05**: Data split into `inventory.json`, `loans.json`, `borrowers.json` and `history.json` (moved automatically from `data.json`, `people.json` and `directory.json`); one borrower list for imported and typed-in people; new names and emails typed into a loan are added to the borrower list.
