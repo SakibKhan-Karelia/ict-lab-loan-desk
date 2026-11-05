@@ -527,7 +527,7 @@ applyTheme();
 /* ---------- storage ---------- */
 const S = {
   inv: new Map(), loans: new Map(), hist: new Map(), borrowers: new Map(), mode: 'starting', db: null, ready: false,
-  histQuery: '', histType: '', histLimit: 100,
+  histQuery: '', histType: '', histLimit: 100, histSelMode: false, histSel: new Set(), histDel: false, visibleHist: [],
   view: 'inventory', invQuery: '', editingId: null, pendingDel: null,
   draft: [], lastSaved: null,
   loanFilter: 'open', loanQuery: '', openLoan: null, retDraft: null, pendingLoanDel: false,
@@ -2036,23 +2036,67 @@ async function exportInventory(items, filename) {
 
 /* ---------- history page ---------- */
 const fmtWhen = iso => { if (!iso) return ''; const d = new Date(iso); if (isNaN(d)) return iso; return `${d.getDate()}.${d.getMonth() + 1}.${d.getFullYear()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; };
+function histBar() {
+  const n = S.histSel.size, shown = S.visibleHist.length;
+  if (!n) S.histDel = false;
+  const ent = k => `${k} entr${k === 1 ? 'y' : 'ies'}`;
+  if (!S.histSelMode) return `<div class="sel-bar idle" role="region" aria-label="Selection">
+    <div class="actions"><button class="btn small" type="button" data-hb="select" ${shown ? '' : 'disabled'}>Select</button></div></div>`;
+  if (S.histDel) return `<div class="sel-bar confirm" role="region" aria-label="Confirm delete">
+    <span><b>Delete ${ent(n)} from the history?</b> This can't be undone in the app.</span>
+    <div class="actions"><button class="btn small danger solid" type="button" data-hb="del-yes">Delete ${ent(n)}</button><button class="btn small" type="button" data-hb="del-no">Cancel</button></div></div>`;
+  const allSel = shown > 0 && S.visibleHist.every(id => S.histSel.has(id));
+  const hidden = [...S.histSel].filter(id => !S.visibleHist.includes(id)).length;
+  return `<div class="sel-bar" role="region" aria-label="Selected history entries">
+    <div class="actions">${allSel
+      ? '<button class="btn small" type="button" data-hb="none">Deselect all</button>'
+      : `<button class="btn small" type="button" data-hb="all" ${shown ? '' : 'disabled'} title="Select every entry that matches the search">Select all</button><button class="btn small" type="button" data-hb="none">${ICON_X}Deselect</button>`}
+      <span><b>${n} selected</b>${hidden ? ` <span class="muted">(${hidden} hidden by the current search)</span>` : ''}</span></div>
+    <div class="actions">${n ? `<button class="btn small danger" type="button" data-hb="del" aria-label="Delete selected history entries">${ICON_BIN}Delete</button>` : ''}</div></div>`;
+}
 function renderHistory() {
   const box = $('#histTable'); if (!box) return;
   const q = S.histQuery.trim().toLowerCase();
   const all = [...S.hist.values()].sort((a, b) => (b.at || '').localeCompare(a.at || ''));
+  for (const id of [...S.histSel]) if (!S.hist.has(id)) S.histSel.delete(id);
   const rows = all.filter(h => (!S.histType || h.type === S.histType) &&
     (!q || [h.action, h.text, h.by, fmtWhen(h.at)].some(v => String(v || '').toLowerCase().includes(q))));
+  S.visibleHist = rows.map(h => h.id);
   const where = S.mode === 'github' ? 'Saved in history.json in the data repository.' : S.mode === 'local' ? 'Saved in this browser.' : '';
-  if (!all.length) { box.innerHTML = `<div class="empty"><strong>No changes recorded yet</strong><span>Every change to devices and loans from now on is listed here. ${where}</span></div>`; return; }
-  if (!rows.length) { box.innerHTML = `<div class="empty"><strong>No matching changes</strong><span>Try another search or type.</span></div>`; return; }
-  const shown = rows.slice(0, S.histLimit);
-  box.innerHTML = `<div class="table-wrap"><table>
-    <thead><tr><th>When</th><th>Who</th><th>Change</th><th>Details</th></tr></thead>
-    <tbody>${shown.map(h => `<tr><td class="hist-when">${esc(fmtWhen(h.at))}</td><td class="hist-who">${h.by ? esc(h.by) : '<span class="muted">–</span>'}</td>
+  if (!all.length) { S.histSelMode = false; box.innerHTML = `<div class="empty"><strong>No changes recorded yet</strong><span>Every change to devices and loans from now on is listed here. ${where}</span></div>`; return; }
+  if (!rows.length) { box.innerHTML = histBar() + `<div class="empty"><strong>No matching changes</strong><span>Try another search or type.</span></div>`; return; }
+  const shown = rows.slice(0, S.histLimit), sel = S.histSelMode;
+  box.innerHTML = histBar() + `<div class="table-wrap"><table>
+    <thead><tr>${sel ? '<th class="sel-td"><span class="visually-hidden">Select</span></th>' : ''}<th>When</th><th>Who</th><th>Change</th><th>Details</th></tr></thead>
+    <tbody>${shown.map(h => `<tr class="${sel && S.histSel.has(h.id) ? 'is-selected' : ''}">${sel ? `<td class="sel-td"><input type="checkbox" data-hsel="${h.id}" ${S.histSel.has(h.id) ? 'checked' : ''} aria-label="Select ${esc(h.action || 'entry')} ${esc(fmtWhen(h.at))}"></td>` : ''}
+      <td class="hist-when">${esc(fmtWhen(h.at))}</td><td class="hist-who">${h.by ? esc(h.by) : '<span class="muted">–</span>'}</td>
       <td class="hist-act">${esc(h.action || '')}</td><td>${esc(h.text || '')}</td></tr>`).join('')}</tbody></table></div>
     <div class="hist-more"><span class="sheet-note">Showing ${shown.length} of ${rows.length} change${rows.length === 1 ? '' : 's'}. ${where}</span>
     ${rows.length > shown.length ? '<button class="btn small" type="button" id="histMore">Show more</button>' : ''}</div>`;
 }
+$('#histTable').addEventListener('change', e => {
+  const t = e.target; if (!t.matches('input[data-hsel]')) return;
+  t.checked ? S.histSel.add(t.dataset.hsel) : S.histSel.delete(t.dataset.hsel); S.histDel = false; renderHistory();
+});
+$('#histTable').addEventListener('click', e => {
+  const b = e.target.closest('[data-hb]'); if (!b) return;
+  switch (b.dataset.hb) {
+    case 'select': S.histSelMode = true; break;
+    case 'all': for (const id of S.visibleHist) S.histSel.add(id); break;
+    case 'none': S.histSel.clear(); S.histSelMode = false; S.histDel = false; break;
+    case 'del': S.histDel = true; break;
+    case 'del-no': S.histDel = false; break;
+    case 'del-yes': {
+      const ids = [...S.histSel], n = ids.length;
+      if (bulkWrite('history', ids.map(id => [id, null]), `Delete ${n} history entr${n === 1 ? 'y' : 'ies'}`)) {
+        S.histSel.clear(); S.histSelMode = false; S.histDel = false;
+        toast(`Deleted ${n} history entr${n === 1 ? 'y' : 'ies'}.`);
+      }
+      break;
+    }
+  }
+  renderHistory();
+});
 $('#histSearch').addEventListener('input', e => { S.histQuery = e.target.value; S.histLimit = 100; renderHistory(); });
 $('#histType').addEventListener('change', e => { S.histType = e.target.value; S.histLimit = 100; renderHistory(); });
 $('#histTable').addEventListener('click', e => { if (e.target.id === 'histMore') { S.histLimit += 200; renderHistory(); } });
@@ -2278,8 +2322,8 @@ function bulkWrite(col, entries, message) {
     clearTimeout(GH.timer); GH.timer = setTimeout(ghSave, 300);
     return true;
   }
-  if (S.mode === 'db') { for (const [id, body] of entries) S.db.collection(col).doc(id).set(body).catch(e => toast(writeErr(e), 'bad')); return true; }
-  for (const [id, body] of entries) map.set(id, { ...body, id });
+  if (S.mode === 'db') { for (const [id, body] of entries) (body === null ? S.db.collection(col).doc(id).delete() : S.db.collection(col).doc(id).set(body)).catch(e => toast(writeErr(e), 'bad')); return true; }
+  for (const [id, body] of entries) body === null ? map.delete(id) : map.set(id, { ...body, id });
   saveLocal(); renderAll(); return true;
 }
 const cellText = v => v == null ? '' : typeof v !== 'object' ? String(v) : v instanceof Date ? v.toISOString().slice(0, 10)

@@ -53,6 +53,7 @@ It keeps track of the lab's devices, records who has borrowed what, produces the
 ### History
 - The **History** page lists every change: devices added, edited, deleted or restocked, loans created, return checks, returns, contact changes and deleted loans, with date, time and who did it.
 - Search the history, or show only inventory or only loan changes.
+- **Select** shows a checkbox on every entry; **Select all** picks every entry that matches the search and filter. **Delete** (bin icon) removes the selected entries from `history.json` after a confirmation. The data repository's commit list still keeps an older copy.
 
 ### General
 - Sidebar with lab totals: units in stock, out on loan, available now and overdue loans.
@@ -150,6 +151,7 @@ The app uses [jsPDF](https://github.com/parallax/jsPDF) for PDF files and [Excel
 
 New features are listed here, newest first.
 
+- **2026-11-05**: Select and delete entries on the History page.
 - **2026-11-05**: Removed the Import student list button (the borrower list is kept).
 - **2026-11-05**: TITE/ICT Program Team added to the group suggestions; its members added to the borrower list.
 - **2026-11-05**: Group suggestions (ICNS23–ICNS26); × in the name suggestions to remove someone from the borrower list.
