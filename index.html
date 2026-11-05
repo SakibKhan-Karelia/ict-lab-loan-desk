@@ -1958,6 +1958,13 @@ function printLoan(l) {
 /* Email: download the Excel record and open the email app with the message filled in.
    A web page cannot attach files to an email by itself, so the file is attached by hand. */
 const emailIn = s => (String(s || '').match(/[^\s@,;:<>()"']+@[^\s@,;:<>()"']+\.[a-z]{2,}/i) || [])[0] || '';
+// Equipment as a plain-text table (email links can only carry plain text).
+function equipmentTable(items) {
+  const rows = [['No.', 'Device / component', 'Serial number', 'Qty'], ...items.map((it, i) => [String(i + 1), it.name || '', it.serial || '–', String(it.qty)])];
+  const w = [0, 1, 2, 3].map(c => Math.max(...rows.map(r => r[c].length)));
+  const line = r => r.map((v, c) => c === 3 ? v.padStart(w[c]) : v.padEnd(w[c])).join(' | ').trimEnd();
+  return [line(rows[0]), w.map(n => '-'.repeat(n)).join('-+-'), ...rows.slice(1).map(line)];
+}
 function loanEmailBody(l) {
   const lines = [
     `Hello ${l.names},`, '',
@@ -1966,10 +1973,8 @@ function loanEmailBody(l) {
     `Start date: ${fmtDate(l.startDate)}`,
     `Return by: ${fmtDate(l.endDate)}`, '',
     'Equipment:',
-    ...(l.items || []).map((it, i) => `${i + 1}. ${it.name} – ${it.qty} pcs${it.serial ? ` (serial ${it.serial})` : ''}`), '',
-    'The loan record is attached as an Excel file.',
-    `Please return all equipment to the ICT Laboratory by ${fmtDate(l.endDate)}.`, '',
-    'Best regards,', 'ICT Laboratory',
+    ...equipmentTable(l.items || []), '',
+    `Please return all equipment to the ICT Laboratory by ${fmtDate(l.endDate)}.`,
   ];
   return lines.join('\r\n');
 }

@@ -151,6 +151,7 @@ The app uses [jsPDF](https://github.com/parallax/jsPDF) for PDF files and [Excel
 
 New features are listed here, newest first.
 
+- **2026-11-05**: Borrower email lists the equipment as a table (No., device, serial number, quantity); removed the attachment line and the sign-off.
 - **2026-11-05**: Select and delete entries on the History page.
 - **2026-11-05**: Removed the Import student list button (the borrower list is kept).
 - **2026-11-05**: TITE/ICT Program Team added to the group suggestions; its members added to the borrower list.
