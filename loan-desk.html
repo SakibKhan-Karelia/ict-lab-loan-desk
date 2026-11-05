@@ -135,7 +135,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--focus);outline:none;b
 .divider{border:0;border-top:1px solid var(--line);margin:16px 0}
 
 /* inventory add bar */
-.add-bar{display:grid;grid-template-columns:minmax(0,2.2fr) minmax(0,1.4fr) minmax(0,1.3fr) 96px minmax(0,2fr) auto;gap:12px;align-items:end;padding:14px 18px}
+.add-bar{display:grid;grid-template-columns:minmax(0,2.2fr) minmax(0,1.4fr) minmax(0,1.3fr) 150px minmax(0,2fr) auto;gap:12px;align-items:end;padding:14px 18px}
 .add-bar .actions{flex-wrap:nowrap}
 @media (max-width:1250px){.add-bar{grid-template-columns:repeat(3,minmax(0,1fr))}.add-bar .actions{grid-column:1/-1}}
 @media (max-width:640px){.add-bar{grid-template-columns:minmax(0,1fr)}}
@@ -240,6 +240,8 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
 .sg-item{padding:7px 12px;cursor:pointer;display:grid;gap:1px;border-left:3px solid transparent}
 .sg-item.on,.sg-item:hover{background:var(--sunken);border-left-color:var(--accent)}
 .sg-main{font-weight:600}
+.sg-tag{font-weight:500;font-size:.75rem;color:var(--ok);background:var(--ok-soft);border-radius:3px;padding:0 5px;margin-left:4px;white-space:nowrap}
+.box-head .link-btn{font-size:.84rem}
 .sg-sub{font-size:.84rem;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .suggest mark{background:none;color:inherit;text-decoration:underline;text-decoration-color:var(--accent);text-decoration-thickness:2px;text-underline-offset:2px}
 /* history */
@@ -399,12 +401,12 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
         <div id="savedBox"></div>
         <form id="loanForm" autocomplete="off" class="loan-grid">
           <div class="box">
-            <div class="box-head"><h2>Borrower</h2></div>
+            <div class="box-head"><h2>Borrower</h2><div class="actions"><span class="sheet-note" id="dirInfo"></span><button type="button" class="link-btn" id="dirImport" title="Import a student / staff list (CSV from Moodle) for name and email suggestions">Import student list</button><input type="file" id="dirFile" accept=".csv,text/csv" hidden></div></div>
             <div class="box-pad form">
               <div class="field"><label for="lnNames">Name(s)</label><input type="text" id="lnNames" required placeholder="Borrower name(s), separated by commas"></div>
               <div class="row2">
                 <div class="field"><label for="lnGroup">Group</label><input type="text" id="lnGroup" placeholder="e.g. TTV23S1"></div>
-                <div class="field"><label for="lnCourse">Course</label><input type="text" id="lnCourse" placeholder="Course or project"></div>
+                <div class="field"><label for="lnCourse">Course</label><input type="text" id="lnCourse" placeholder="Type a course name or code"></div>
               </div>
               <div class="row2">
                 <div class="field"><label for="lnStart">Start date</label><input type="date" id="lnStart" required></div>
@@ -519,7 +521,7 @@ applyTheme();
 
 /* ---------- storage ---------- */
 const S = {
-  inv: new Map(), loans: new Map(), hist: new Map(), people: new Map(), mode: 'starting', db: null, ready: false,
+  inv: new Map(), loans: new Map(), hist: new Map(), people: new Map(), dir: new Map(), mode: 'starting', db: null, ready: false,
   histQuery: '', histType: '', histLimit: 100,
   view: 'inventory', invQuery: '', editingId: null, pendingDel: null,
   draft: [], lastSaved: null,
@@ -533,12 +535,13 @@ function loadLocal() {
     S.loans = new Map(Object.entries(j.loans || {}).map(([k, v]) => [k, { ...v, id: k }]));
     S.hist = new Map(Object.entries(j.history || {}).map(([k, v]) => [k, { ...v, id: k }]));
     S.people = new Map(Object.entries(j.people || {}).map(([k, v]) => [k, { ...v, id: k }]));
+    S.dir = new Map(Object.entries(j.directory || {}).map(([k, v]) => [k, { ...v, id: k }]));
   } catch (e) {}
 }
 function saveLocal() {
   try {
     const strip = m => Object.fromEntries([...m].map(([k, v]) => { const o = { ...v }; delete o.id; return [k, o]; }));
-    localStorage.setItem(LS_KEY, JSON.stringify({ inventory: strip(S.inv), loans: strip(S.loans), history: strip(S.hist), people: strip(S.people) }));
+    localStorage.setItem(LS_KEY, JSON.stringify({ inventory: strip(S.inv), loans: strip(S.loans), history: strip(S.hist), people: strip(S.people), directory: strip(S.dir) }));
   } catch (e) {}
 }
 function writeErr(e) {
@@ -551,9 +554,9 @@ function writeErr(e) {
 const GH_KEY = 'ict-lab-loan-desk-github';
 const GH = { cfg: null, head: null, remote: emptyData(), ops: new Map(), msgs: [], timer: null, saving: false, again: false, state: 'idle', lastPull: 0 };
 // The data repository holds three files: data.json (inventory and loans), history.json (every change) and people.json (borrowers for suggestions).
-const FILE_COLS = { data: ['inventory', 'loans'], history: ['history'], people: ['people'] };
+const FILE_COLS = { data: ['inventory', 'loans'], history: ['history'], people: ['people'], directory: ['directory'] };
 const HIST_MAX = 20000;
-function emptyData() { return { inventory: {}, loans: {}, history: {}, people: {} }; }
+function emptyData() { return { inventory: {}, loans: {}, history: {}, people: {}, directory: {} }; }
 function ghLoadCfg() {
   for (const store of [() => localStorage, () => sessionStorage]) {
     try { const v = store().getItem(GH_KEY); if (v) return JSON.parse(v); } catch (e) {}
@@ -607,6 +610,7 @@ const asObj = v => Array.isArray(v) ? listToObj(v) : (v && typeof v === 'object'
 function parseFile(f, j) {
   if (f === 'history') return { history: asObj(j && j.history) };
   if (f === 'people') return { people: asObj(j && j.people) };
+  if (f === 'directory') return { directory: asObj(j && j.people) };
   return { inventory: (j && j.inventory) || {}, loans: (j && j.loans) || {} };
 }
 function fileText(f, d) {
@@ -615,6 +619,8 @@ function fileText(f, d) {
     objToList(d.history).sort((a, b) => (b.at || '').localeCompare(a.at || '')).slice(0, HIST_MAX));
   if (f === 'people') return lines('ICT Lab Loan Desk: borrowers, used for name and email suggestions in New loan', 'people',
     objToList(d.people).sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base' })));
+  if (f === 'directory') return lines('ICT Lab Loan Desk: students and staff imported from Moodle, used for name and email suggestions', 'people',
+    objToList(d.directory).sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base' })));
   return JSON.stringify({ inventory: d.inventory, loans: d.loans }, null, 1);
 }
 async function ghGetFile(path, ref) {
@@ -655,6 +661,7 @@ function ghView() {
   S.loans = new Map(Object.entries(d.loans).map(([k, v]) => [k, { ...v, id: k }]));
   S.hist = new Map(Object.entries(d.history).map(([k, v]) => [k, { ...v, id: k }]));
   S.people = new Map(Object.entries(d.people).map(([k, v]) => [k, { ...v, id: k }]));
+  S.dir = new Map(Object.entries(d.directory).map(([k, v]) => [k, { ...v, id: k }]));
 }
 function ghDescribe(col, id, body) {
   if (body === null) { const old = colMap(col).get(id); return `Delete ${col === 'inventory' ? 'device' : 'loan'} ${old ? (old.name || old.names || id) : id}`; }
@@ -890,7 +897,7 @@ $('#loginForm').addEventListener('submit', async e => {
 });
 function signOut(note) {
   ghSaveCfg(null); GH.cfg = null; GH.ops = new Map(); GH.msgs = []; GH.head = null; GH.remote = emptyData();
-  S.inv = new Map(); S.loans = new Map(); S.hist = new Map(); S.people = new Map(); S.ready = false; S.mode = 'starting'; S.lastSaved = null; S.openLoan = null;
+  S.inv = new Map(); S.loans = new Map(); S.hist = new Map(); S.people = new Map(); S.dir = new Map(); S.ready = false; S.mode = 'starting'; S.lastSaved = null; S.openLoan = null;
   renderAll(); showGate(note);
 }
 function openAccountPanel() {
@@ -1027,7 +1034,7 @@ window.addEventListener('focus', ghRefresh);
 document.addEventListener('visibilitychange', () => { if (!document.hidden) ghRefresh(); });
 
 const chains = {};
-const colMap = col => ({ inventory: S.inv, loans: S.loans, history: S.hist, people: S.people })[col];
+const colMap = col => ({ inventory: S.inv, loans: S.loans, history: S.hist, people: S.people, directory: S.dir })[col];
 function writeDoc(col, id, data, before) {
   const map = colMap(col);
   const body = { ...data }; delete body.id;
@@ -1100,10 +1107,11 @@ function rememberPerson(l, newLoan) {
 // Saved people first; older loans fill in anyone not saved yet.
 function peopleList() {
   const m = new Map();
+  for (const d of S.dir.values()) { const k = personKey(d.name); if (k && !m.has(k)) m.set(k, { ...d, loans: 0 }); }
   for (const l of [...S.loans.values()].sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || ''))) {
     const k = personKey(l.names); if (!k) continue;
     const o = m.get(k) || { loans: 0 };
-    m.set(k, { name: l.names.trim(), email: emailIn(l.contact) || o.email || '', contact: l.contact || o.contact || '',
+    m.set(k, { ...o, name: l.names.trim(), email: emailIn(l.contact) || o.email || '', contact: l.contact || o.contact || '',
       group: l.group || o.group || '', course: l.course || o.course || '', lastAt: l.createdAt || o.lastAt || '', loans: o.loans + 1 });
   }
   for (const p of S.people.values()) { const k = personKey(p.name); if (k) m.set(k, { ...m.get(k), ...p, loans: Math.max(p.loans || 0, (m.get(k) || {}).loans || 0) }); }
@@ -1156,6 +1164,7 @@ async function startStorage() {
     if (!snap.metadata.fromCache) gotLoans = true; settle();
   }, fail('loans'));
   db.collection('history').onSnapshot(snap => { S.hist = new Map(snap.docs.map(d => [d.id, { ...d.data(), id: d.id }])); renderAll(); }, () => {});
+  db.collection('directory').onSnapshot(snap => { S.dir = new Map(snap.docs.map(d => [d.id, { ...d.data(), id: d.id }])); renderAll(); }, () => {});
   db.collection('people').onSnapshot(snap => { S.people = new Map(snap.docs.map(d => [d.id, { ...d.data(), id: d.id }])); renderAll(); }, () => {});
 }
 
@@ -1190,7 +1199,7 @@ function setView(v, push = true) {
 document.querySelector('.tabs').addEventListener('click', e => { const b = e.target.closest('button[data-view]'); if (b) setView(b.dataset.view); });
 
 /* ---------- render ---------- */
-function renderAll() { renderStats(); renderFilters(); renderCats(); renderInventory(); renderPicker(); renderDraft(); renderSaved(); renderLoans(); renderDetail(); renderBadge(); renderHistory(); }
+function renderAll() { renderStats(); renderFilters(); renderCats(); renderInventory(); renderPicker(); renderDraft(); renderSaved(); renderLoans(); renderDetail(); renderBadge(); renderHistory(); renderDirInfo(); }
 
 function renderStats() {
   const onLoan = onLoanMap();
@@ -1586,7 +1595,7 @@ function renderDraft() {
 $('#draftTable').addEventListener('click', e => { const b = e.target.closest('[data-rm]'); if (!b) return; S.draft = S.draft.filter(d => d.key !== b.dataset.rm); renderPicker(); renderDraft(); });
 function resetLoanForm() {
   $('#loanForm').reset(); S.draft = [];
-  $('#lnStart').value = todayISO(); $('#lnEnd').value = addDays(todayISO(), 14);
+  $('#lnStart').value = todayISO(); $('#lnEnd').value = addDays(todayISO(), 14); $('#lnEnd').min = todayISO();
   renderPicker(); renderDraft();
   for (const i of document.querySelectorAll('.num-step input[type=number]')) syncStepButtons(i);
 }
@@ -1995,46 +2004,50 @@ $('#histSearch').addEventListener('input', e => { S.histQuery = e.target.value; 
 $('#histType').addEventListener('change', e => { S.histType = e.target.value; S.histLimit = 100; renderHistory(); });
 $('#histTable').addEventListener('click', e => { if (e.target.id === 'histMore') { S.histLimit += 200; renderHistory(); } });
 
-/* ---------- name and email suggestions in New loan ---------- */
+/* ---------- suggestions in New loan: names, emails and courses ---------- */
 function markMatch(text, q) {
   const t = String(text || ''), i = q ? t.toLowerCase().indexOf(q.toLowerCase()) : -1;
   if (i < 0) return esc(t);
   return esc(t.slice(0, i)) + '<mark>' + esc(t.slice(i, i + q.length)) + '</mark>' + esc(t.slice(i + q.length));
 }
-function findPeople(q, fields) {
+function rankMatches(list, q, fields, tie) {
   const ql = q.trim().toLowerCase(); if (!ql) return [];
-  return peopleList().map(p => {
+  return list.map(p => {
     let score = -1;
     for (const f of fields) {
       const s = String(p[f] || '').toLowerCase(); if (!s) continue;
       if (s.startsWith(ql)) score = Math.max(score, 2);
-      else if (s.split(/[\s,.@_-]+/).some(w => w.startsWith(ql))) score = Math.max(score, 1);
+      else if (s.split(/[\s,.@_()-]+/).some(w => w.startsWith(ql))) score = Math.max(score, 1);
       else if (s.includes(ql)) score = Math.max(score, 0);
     }
     return { p, score };
   }).filter(x => x.score >= 0)
-    .sort((a, b) => b.score - a.score || (b.p.lastAt || '').localeCompare(a.p.lastAt || ''))
+    .sort((a, b) => b.score - a.score || tie(a.p, b.p))
     .slice(0, 8).map(x => x.p);
 }
+// People who borrowed before come first, then the rest of the student and staff list.
+const findPeople = (q, fields) => rankMatches(peopleList(), q, fields,
+  (a, b) => (b.loans ? 1 : 0) - (a.loans ? 1 : 0) || (b.lastAt || '').localeCompare(a.lastAt || '') || (a.name || '').localeCompare(b.name || ''));
 function attachSuggest(input, o) {
   const box = document.createElement('div');
   box.className = 'suggest'; box.id = input.id + 'Suggest'; box.setAttribute('role', 'listbox'); box.hidden = true;
   input.parentElement.classList.add('has-suggest'); input.parentElement.appendChild(box);
   input.setAttribute('role', 'combobox'); input.setAttribute('aria-autocomplete', 'list');
   input.setAttribute('aria-expanded', 'false'); input.setAttribute('aria-controls', box.id);
+  input.setAttribute('autocomplete', 'off');
   let items = [], idx = -1, q = '';
   const close = () => { box.hidden = true; idx = -1; input.setAttribute('aria-expanded', 'false'); input.removeAttribute('aria-activedescendant'); };
   const draw = () => {
-    box.innerHTML = `<div class="sg-head">Borrowed before</div>` + items.map((p, i) => {
-      const [main, sub] = o.label(p);
+    box.innerHTML = items.map((p, i) => {
+      const [main, sub, tag] = o.label(p);
       return `<div class="sg-item${i === idx ? ' on' : ''}" role="option" id="${box.id}-${i}" aria-selected="${i === idx}" data-i="${i}">
-        <span class="sg-main">${markMatch(main, q)}</span>${sub ? `<span class="sg-sub">${markMatch(sub, q)}</span>` : ''}</div>`;
+        <span class="sg-main">${markMatch(main, q)}${tag ? ` <span class="sg-tag">${esc(tag)}</span>` : ''}</span>${sub ? `<span class="sg-sub">${markMatch(sub, q)}</span>` : ''}</div>`;
     }).join('');
     if (idx >= 0) { input.setAttribute('aria-activedescendant', `${box.id}-${idx}`); const el = $('#' + box.id + '-' + idx); if (el) el.scrollIntoView({ block: 'nearest' }); }
     else input.removeAttribute('aria-activedescendant');
   };
   const update = () => {
-    q = input.value.trim(); items = q ? findPeople(q, o.fields) : [];
+    q = input.value.trim(); items = q ? o.find(q) : [];
     // nothing to suggest when the box already holds exactly the one match
     if (items.length === 1 && String(o.label(items[0])[0]).toLowerCase() === q.toLowerCase() && o.isFilled(items[0])) items = [];
     idx = -1;
@@ -2055,6 +2068,8 @@ function attachSuggest(input, o) {
   box.addEventListener('mousedown', e => { const it = e.target.closest('[data-i]'); if (!it) return; e.preventDefault(); pick(+it.dataset.i); });
 }
 const contactOf = p => p.contact || p.email || '';
+const studentNo = p => { const u = String(p.username || ''); return /^\d+@/.test(u) ? u.split('@')[0] : ''; };
+const personTag = p => p.loans ? `borrowed ${p.loans}×` : p.role === 'staff' ? 'staff' : '';
 function fillBorrower(p, from) {
   const set = (sel, v, force) => { const el = $(sel); if (v && (force || !el.value.trim())) el.value = v; };
   set('#lnNames', p.name, from === 'names');
@@ -2062,16 +2077,128 @@ function fillBorrower(p, from) {
   set('#lnGroup', p.group); set('#lnCourse', p.course);
 }
 attachSuggest($('#lnNames'), {
-  fields: ['name'],
-  label: p => [p.name, [contactOf(p), p.group].filter(Boolean).join(' · ')],
+  find: q => findPeople(q, ['name', 'username']),
+  label: p => [p.name, [contactOf(p), p.group, studentNo(p)].filter(Boolean).join(' · '), personTag(p)],
   isFilled: p => $('#lnContact').value.trim() === contactOf(p),
   pick: p => { fillBorrower(p, 'names'); toast(`Filled in ${p.name}${contactOf(p) ? ' and their contact' : ''}.`); }
 });
 attachSuggest($('#lnContact'), {
-  fields: ['email', 'contact', 'name'],
-  label: p => [contactOf(p) || p.name, contactOf(p) ? p.name : ''],
+  find: q => findPeople(q, ['email', 'contact', 'name', 'username']),
+  label: p => [contactOf(p) || p.name, contactOf(p) ? p.name : '', personTag(p)],
   isFilled: p => $('#lnNames').value.trim().toLowerCase() === (p.name || '').toLowerCase(),
   pick: p => fillBorrower(p, 'contact')
+});
+
+/* courses: the ICT curriculum, plus any other course typed in earlier loans */
+const CURRICULUM = [
+  ['IC10006', 'Introduction to Computing'], ['IC10011', 'Digital Technology Essentials'], ['IC10007', 'IT Infrastructure Architecture'],
+  ['IC10010', 'Introduction to Information Security'], ['IC10012', 'Elementary Programming'], ['IC10013', 'Object-Oriented Programming'],
+  ['IC10022', 'Web Programming'], ['IC10019', 'Engineering Mathematics'], ['IC10004', 'ICT Business'],
+  ['IC10001', 'Career Planning and Development I'], ['IC10002', 'English Communication Skills'], ['IC10003', 'Working in International Teams'],
+  ['KP10017', 'Finnish I'], ['KP10018', 'Finnish II'], ['IC10017', 'Business Communication in Finnish'],
+  ['IC10018', 'Data Structures and Algorithms'], ['IC10021', 'Discrete Mathematics and Computability'], ['IC10020', 'Engineering Physics'],
+  ['IC10054', 'Introduction to Networks'], ['IC10055', 'Applied Networks'], ['IC10014', 'User Interface Programming'],
+  ['IC10025', 'API Programming'], ['IC10029', 'Quality Engineering and Software Testing'], ['IC10009', 'Data Management Systems I'],
+  ['IC10024', 'Software Engineering I'], ['IC10008', 'Human Factors of Interactive Technology'], ['IC10015', 'Career Planning and Development II'],
+  ['IC10052', 'Professional English'], ['KP10019', 'Finnish III'], ['IC10017', 'Business Communication in Swedish'],
+  ['IC10016', 'Swedish for Work'], ['', 'AI Programming'], ['IC10032', 'Machine Learning and Data Mining'],
+  ['IC10033', 'Software Engineering II'], ['IC10034', 'Data Engineering'], ['IC10026', 'Data Management Systems II'],
+  ['IC10035', 'Backend Development'], ['IC10036', 'Frontend Development'], ['IC10037', 'Mobile Application Development'],
+  ['IC10027', 'Server Management'], ['IC10028', 'IoT Programming'], ['IC10030', 'IoT and Cloud Services'],
+  ['IC10039', 'Smart Regions, Cities and Buildings'], ['IC10041', 'Business Process Management and Workflow Automation'],
+  ['IC10040', 'Intelligent Automation'], ['IC10038', 'Project Work'], ['IC10031', 'English for Thesis Writing'],
+  ['IC10042', 'Career Planning and Development III'], ['IC10043', 'Research and Development Methodologies'],
+  ['IC10044', 'Practical Training'], ['KY10006', 'Thesis, planning'], ['KY10007', 'Thesis, implementation'], ['KY10008', 'Thesis, reporting']
+].map(([code, name]) => ({ code, name, text: code ? `${code} ${name}` : name }));
+function courseList() {
+  const seen = new Set(CURRICULUM.map(c => c.text.toLowerCase())), used = {};
+  for (const l of S.loans.values()) { const c = (l.course || '').trim(); if (c) used[c.toLowerCase()] = (used[c.toLowerCase()] || 0) + 1; }
+  const extra = [...new Set([...S.loans.values()].map(l => (l.course || '').trim()).filter(c => c && !seen.has(c.toLowerCase())))]
+    .map(c => ({ code: '', name: c, text: c, earlier: true }));
+  return [...CURRICULUM, ...extra].map(c => ({ ...c, used: used[c.text.toLowerCase()] || 0 }));
+}
+attachSuggest($('#lnCourse'), {
+  find: q => rankMatches(courseList(), q, ['text', 'name', 'code'], (a, b) => b.used - a.used || a.text.localeCompare(b.text)),
+  label: c => [c.text, '', c.earlier ? 'used before' : ''],
+  isFilled: () => true,
+  pick: c => { $('#lnCourse').value = c.text; }
+});
+
+/* ---------- student and staff list (directory.json in the private data repository) ---------- */
+function parseCsv(text) {
+  const rows = []; let row = [], cell = '', q = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (q) { if (ch === '"') { if (text[i + 1] === '"') { cell += '"'; i++; } else q = false; } else cell += ch; continue; }
+    if (ch === '"') q = true;
+    else if (ch === ',' || ch === ';' || ch === '\t') { row.push(cell); cell = ''; }
+    else if (ch === '\n' || ch === '\r') { if (ch === '\r' && text[i + 1] === '\n') i++; row.push(cell); rows.push(row); row = []; cell = ''; }
+    else cell += ch;
+  }
+  if (cell || row.length) { row.push(cell); rows.push(row); }
+  return rows.filter(r => r.some(c => c.trim()));
+}
+// Reads a Moodle participants / completion export: "Full name" (or First name + Last name), "Username", "Email address".
+function directoryFromCsv(text) {
+  const rows = parseCsv(text.replace(/^﻿/, '')); if (rows.length < 2) return [];
+  const head = rows[0].map(h => h.trim().toLowerCase());
+  const col = (...names) => head.findIndex(h => names.some(n => h === n || h.startsWith(n)));
+  const iName = col('full name', 'name'), iFirst = col('first name'), iLast = col('last name', 'surname');
+  const iUser = col('username'), iMail = col('email address', 'email');
+  if ((iName < 0 && iFirst < 0) || iMail < 0) return null;
+  const byName = new Map();
+  for (const r of rows.slice(1)) {
+    const name = (iName >= 0 ? r[iName] : `${r[iFirst] || ''} ${r[iLast] || ''}`).trim().replace(/\s+/g, ' ');
+    const email = (r[iMail] || '').trim(), username = iUser >= 0 ? (r[iUser] || '').trim() : '';
+    if (!name || !emailIn(email)) continue;
+    if (/oppimisanalytiikka|^karelia\s/i.test(name)) continue; // system accounts
+    const p = { name, email, username, role: /@edu\.karelia\.fi$/i.test(email) || /@edu\.karelia\.fi$/i.test(username) ? 'student' : /@karelia\.fi$/i.test(email) ? 'staff' : 'other' };
+    const k = personKey(name), old = byName.get(k);
+    // the same person twice (e.g. a private email and a school email): keep the school one
+    if (old && old.role !== 'other' && p.role === 'other') continue;
+    byName.set(k + (old && old.role !== 'other' && p.role !== 'other' && old.email.toLowerCase() !== email.toLowerCase() ? '#' + email.toLowerCase() : ''), p);
+  }
+  return [...byName.values()];
+}
+function bulkWrite(col, entries, message) {
+  if (!S.ready) { toast('Still loading your data. Try again in a moment.', 'bad'); return false; }
+  const map = colMap(col);
+  if (S.mode === 'github') {
+    for (const [id, body] of entries) GH.ops.set(col + '/' + id, body);
+    GH.msgs.push(message); ghView(); renderAll(); setSync('pending');
+    clearTimeout(GH.timer); GH.timer = setTimeout(ghSave, 300);
+    return true;
+  }
+  if (S.mode === 'db') { for (const [id, body] of entries) S.db.collection(col).doc(id).set(body).catch(e => toast(writeErr(e), 'bad')); return true; }
+  for (const [id, body] of entries) map.set(id, { ...body, id });
+  saveLocal(); renderAll(); return true;
+}
+async function importDirectory(file) {
+  const list = directoryFromCsv(await file.text());
+  if (list === null) { toast('That file has no "Full name" and "Email address" columns.', 'bad'); return; }
+  if (!list.length) { toast('No names with email addresses found in that file.', 'bad'); return; }
+  const now = new Date().toISOString();
+  const entries = list.map(p => ['d' + personId(p.email.toLowerCase()).slice(1), { ...p, imported: now }]);
+  const added = entries.filter(([id]) => !S.dir.has(id)).length;
+  if (bulkWrite('directory', entries, `Import ${list.length} ${list.length === 1 ? "person" : "people"} from ${file.name}`)) {
+    writeDoc('history', uid(), { at: now, by: whoAmI(), type: 'people', action: 'People list imported', text: `${file.name}: ${list.length} people (${added} new)` });
+    toast(`Imported ${list.length} people (${added} new). Their names and emails are now suggested.`);
+  }
+}
+$('#dirImport').addEventListener('click', () => $('#dirFile').click());
+$('#dirFile').addEventListener('change', e => { const f = e.target.files[0]; e.target.value = ''; if (f) importDirectory(f); });
+function renderDirInfo() {
+  const n = S.dir.size; $('#dirInfo').textContent = n ? `${n} students and staff listed` : '';
+}
+
+$('#lnStart').addEventListener('change', () => {
+  const st = $('#lnStart').value, en = $('#lnEnd');
+  en.min = st || '';
+  if (st && (!en.value || en.value < st)) { en.value = addDays(st, 14); toast('End date moved to two weeks after the start date.'); }
+});
+$('#lnEnd').addEventListener('change', () => {
+  const st = $('#lnStart').value, en = $('#lnEnd');
+  if (st && en.value && en.value < st) { en.value = st; toast('The end date can\'t be before the start date.', 'bad'); }
 });
 
 /* ---------- number boxes: − / + buttons, whole numbers only, never below the minimum ---------- */
