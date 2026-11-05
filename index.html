@@ -169,6 +169,14 @@ tr.is-selected td{background:color-mix(in srgb,var(--accent) 13%,var(--surface))
 .visually-hidden{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 .sel-bar .muted{font-size:.88rem}
 .sel-bar .btn svg{margin-right:1px}
+.gate{display:grid;place-items:center;padding-block:6vh}
+.gate-card{width:min(400px,100%);gap:14px}
+.gate-card h2{font-size:1.4rem;color:var(--head-ink)}
+.check{display:flex;align-items:center;gap:8px;font-size:.9rem;cursor:pointer}
+.check input{width:16px;height:16px;accent-color:var(--brand)}
+body.gated .view,body.gated .tabs,body.gated .side-stats,body.gated #banner{display:none!important}
+.row3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+@media (max-width:640px){.row3{grid-template-columns:minmax(0,1fr)}}
 .email-add{margin-top:8px;flex-wrap:nowrap}
 .email-add input{max-width:280px}
 .label-row{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
@@ -250,6 +258,7 @@ tr.confirm td{background:var(--bad-soft)}
     </nav>
     <dl class="side-stats" id="stats"></dl>
     <div class="tools">
+      <button class="tool" id="usersBtn" type="button" hidden><svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><circle cx="6" cy="5" r="2.6" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M1.5 14c.4-2.7 2.2-4.2 4.5-4.2s4.1 1.5 4.5 4.2M11 3.2a2.4 2.4 0 010 4.6M12.6 9.9c1.1.6 1.8 1.9 2 4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>Helpers</button>
       <button class="tool" id="storageBtn" type="button" hidden></button>
       <button class="tool" id="themeBtn" type="button" title="Switch between automatic, light and dark theme"></button>
     </div>
@@ -281,6 +290,44 @@ tr.confirm td{background:var(--bad-soft)}
             <button type="button" class="btn danger" id="ghDisconnect" hidden>Disconnect this browser</button>
             <span class="sheet-note" id="ghMsg"></span>
           </div>
+        </form>
+      </section>
+
+      <!-- SIGN IN (helpers) -->
+      <section id="loginGate" class="gate" hidden>
+        <form class="panel gate-card form" id="loginForm" autocomplete="on">
+          <h2>Sign in</h2>
+          <p class="sheet-note" id="loginNote">Sign in with the username and password you got from the lab owner.</p>
+          <div class="field"><label for="loginUser">Username</label><input type="text" id="loginUser" autocomplete="username" autocapitalize="none" spellcheck="false" required></div>
+          <div class="field"><label for="loginPass">Password</label><input type="password" id="loginPass" autocomplete="current-password" required></div>
+          <label class="check"><input type="checkbox" id="loginKeep"> Keep me signed in on this computer</label>
+          <div class="actions"><button type="submit" class="btn primary" id="loginBtn">Sign in</button><span class="sheet-note" id="loginMsg" role="alert"></span></div>
+          <hr class="divider">
+          <p class="sheet-note">Lab owner? <button type="button" class="link-btn" id="ownerConnect">Connect with your GitHub token</button></p>
+        </form>
+      </section>
+
+      <!-- ACCOUNT (signed-in helper) -->
+      <section id="accountPanel" class="panel" hidden style="margin-bottom:20px">
+        <div class="panel-head"><h2>Your account</h2><button class="btn small" type="button" id="accountClose">Close</button></div>
+        <p id="accountText"></p>
+        <div class="actions" style="margin-top:12px"><button class="btn danger" type="button" id="logoutBtn">Sign out</button><span class="sheet-note" id="accountMsg"></span></div>
+      </section>
+
+      <!-- HELPERS (owner) -->
+      <section id="usersPanel" class="panel" hidden style="margin-bottom:20px">
+        <div class="panel-head"><h2>Helpers</h2><button class="btn small" type="button" id="usersClose">Close</button></div>
+        <p class="sheet-note" style="max-width:80ch">Helpers sign in with a username and password. They can use the whole app: inventory, loans and return checks. They can't manage helpers. Every change they save shows their username.</p>
+        <div id="helperTokenBox" style="margin-top:14px"></div>
+        <div id="usersList" style="margin-top:14px"></div>
+        <form class="form" id="addUserForm" autocomplete="off" style="margin-top:16px">
+          <h3>Add a helper</h3>
+          <div class="row3">
+            <div class="field"><label for="newUser">Username</label><input type="text" id="newUser" autocapitalize="none" spellcheck="false" placeholder="e.g. anna" required></div>
+            <div class="field"><label for="newPass">Password</label><input type="password" id="newPass" autocomplete="new-password" placeholder="At least 12 characters" required></div>
+            <div class="field"><label for="newPass2">Repeat password</label><input type="password" id="newPass2" autocomplete="new-password" required></div>
+          </div>
+          <div class="actions"><button type="submit" class="btn primary" id="addUserBtn">Add helper</button><span class="sheet-note" id="usersMsg" role="status"></span></div>
         </form>
       </section>
 
@@ -472,8 +519,21 @@ function writeErr(e) {
 /* ---------- GitHub storage (used outside the Claude viewer, e.g. on GitHub Pages) ---------- */
 const GH_KEY = 'ict-lab-loan-desk-github';
 const GH = { cfg: null, sha: null, remote: { inventory: {}, loans: {} }, ops: new Map(), msgs: [], timer: null, saving: false, again: false, state: 'idle', lastPull: 0 };
-function ghLoadCfg() { try { return JSON.parse(localStorage.getItem(GH_KEY) || 'null'); } catch (e) { return null; } }
-function ghSaveCfg(c) { try { c ? localStorage.setItem(GH_KEY, JSON.stringify(c)) : localStorage.removeItem(GH_KEY); } catch (e) {} }
+function ghLoadCfg() {
+  for (const store of [() => localStorage, () => sessionStorage]) {
+    try { const v = store().getItem(GH_KEY); if (v) return JSON.parse(v); } catch (e) {}
+  }
+  return null;
+}
+// persist=false keeps a helper signed in only until the browser is closed.
+function ghSaveCfg(c, persist = true) {
+  try { localStorage.removeItem(GH_KEY); } catch (e) {}
+  try { sessionStorage.removeItem(GH_KEY); } catch (e) {}
+  if (!c) return;
+  try { (persist ? localStorage : sessionStorage).setItem(GH_KEY, JSON.stringify(c)); } catch (e) {}
+}
+const isHelper = () => !!(GH.cfg && GH.cfg.role === 'helper');
+const whoAmI = () => GH.cfg ? (GH.cfg.user || GH.cfg.owner || '') : '';
 const b64enc = s => { const b = new TextEncoder().encode(s); let bin = ''; for (let i = 0; i < b.length; i += 0x8000) bin += String.fromCharCode.apply(null, b.subarray(i, i + 0x8000)); return btoa(bin); };
 const b64dec = s => new TextDecoder().decode(Uint8Array.from(atob(String(s).replace(/\s/g, '')), c => c.charCodeAt(0)));
 function ghHeaders() { return { Authorization: 'Bearer ' + GH.cfg.token, Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' }; }
@@ -485,6 +545,7 @@ function ghExplain(e) {
   if (kind === 'auth') return 'GitHub refused the token. Check that it is not expired and has Contents “Read and write” access to the data repository.';
   if (kind === 'repo') return `Repository ${GH.cfg.owner}/${GH.cfg.repo} was not found, or the token cannot see it.`;
   if (kind === 'net') return 'Could not reach GitHub. Check your internet connection.';
+  if (kind === 'siteperm') return `Your token can't save to the website repository ${SITE.owner}/${SITE.repo}. Edit your token on GitHub and add that repository with Contents “Read and write”.`;
   return 'GitHub returned an error' + (e && e.message ? ` (${e.message})` : '') + '.';
 }
 async function ghFetch(url, opts = {}) {
@@ -542,7 +603,8 @@ async function ghSave() {
   if (!GH.ops.size) return;
   GH.saving = true; setSync('saving');
   const ops = new Map(GH.ops), nMsgs = GH.msgs.length;
-  const message = GH.msgs[0] + (nMsgs > 1 ? ` (+${nMsgs - 1} more change${nMsgs > 2 ? 's' : ''})` : '');
+  const who = whoAmI();
+  const message = GH.msgs[0] + (nMsgs > 1 ? ` (+${nMsgs - 1} more change${nMsgs > 2 ? 's' : ''})` : '') + (who ? ` · by ${who}` : '');
   try {
     let done = false;
     for (let attempt = 0; attempt < 3 && !done; attempt++) {
@@ -585,11 +647,13 @@ function setSync(state) {
     saving: ['warn', 'Saving…'], error: ['bad', 'Not saved · retry'], loading: ['warn', 'Loading…'], idle: ['ok', 'GitHub']
   };
   const [cls, text] = map[state] || map.idle;
-  b.innerHTML = `<span class="dot ${cls}" aria-hidden="true"></span>${text}`;
-  b.title = S.mode === 'github' ? `Data file: ${GH.cfg.owner}/${GH.cfg.repo}/${GH.cfg.path}` : 'Set up GitHub storage';
+  b.innerHTML = `<span class="dot ${cls}" aria-hidden="true"></span>${text}${isHelper() ? ` · ${esc(GH.cfg.user)}` : ''}`;
+  b.title = isHelper() ? `Signed in as ${GH.cfg.user}` : S.mode === 'github' ? `Data file: ${GH.cfg.owner}/${GH.cfg.repo}/${GH.cfg.path}` : 'Set up GitHub storage';
+  $('#usersBtn').hidden = !(S.mode === 'github' && !isHelper());
 }
 $('#storageBtn').addEventListener('click', () => {
   if (S.mode === 'github' && GH.state === 'error') { ghSave(); return; }
+  if (isHelper()) { openAccountPanel(); return; }
   openGhPanel();
 });
 function openGhPanel() {
@@ -605,9 +669,11 @@ function openGhPanel() {
 $('#ghClose').addEventListener('click', () => { $('#ghPanel').hidden = true; });
 $('#ghForm').addEventListener('submit', async e => {
   e.preventDefault();
-  const prev = GH.cfg || ghLoadCfg();
+  const prev0 = GH.cfg || ghLoadCfg();
+  const prev = prev0 && prev0.role === 'helper' ? null : prev0; // a helper's sign-in is never reused as the owner's connection
   const cfg = { owner: $('#ghOwner').value.trim(), repo: $('#ghRepo').value.trim(), branch: $('#ghBranch').value.trim() || 'main',
     path: $('#ghPath').value.trim().replace(/^\/+/, '') || 'data.json', token: $('#ghToken').value.trim() || (prev && prev.token) || '' };
+  if (prev && prev.helperToken) cfg.helperToken = prev.helperToken;
   if (!cfg.token) { $('#ghMsg').textContent = 'Paste your access token first.'; return; }
   $('#ghConnect').disabled = true; $('#ghMsg').textContent = 'Connecting…';
   const wasLocal = S.mode !== 'github';
@@ -624,6 +690,7 @@ $('#ghForm').addEventListener('submit', async e => {
       for (const [id, v] of localLoans) { const o = { ...v }; delete o.id; GH.ops.set('loans/' + id, o); }
       GH.msgs.push('Import data from browser');
     }
+    hideGate();
     ghView(); renderAll(); banner(null); setSync(GH.ops.size ? 'pending' : 'saved');
     if (GH.ops.size) ghSave();
     $('#ghPanel').hidden = true;
@@ -640,6 +707,232 @@ $('#ghDisconnect').addEventListener('click', () => {
   toast('Disconnected. The token was removed from this browser.');
 });
 window.addEventListener('beforeunload', e => { if (S.mode === 'github' && (GH.ops.size || GH.saving)) { e.preventDefault(); e.returnValue = ''; } });
+
+/* ---------- helper accounts ----------
+   users.json lives in the public website repository. For each helper it holds the helper access token,
+   encrypted with a key made from that helper's password (PBKDF2, 600 000 rounds, then AES-GCM).
+   The owner keeps the plain helper token only in their own browser. */
+const SITE = { owner: 'SakibKhan-Karelia', repo: 'ict-lab-loan-desk', branch: 'main', path: 'users.json' };
+const KDF_ROUNDS = 600000, MIN_PW = 12;
+const u8b64 = u8 => { let s = ''; for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000)); return btoa(s); };
+const b64u8 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+async function pwKey(pw, salt, rounds = KDF_ROUNDS) {
+  const base = await crypto.subtle.importKey('raw', new TextEncoder().encode(pw), 'PBKDF2', false, ['deriveKey']);
+  return crypto.subtle.deriveKey({ name: 'PBKDF2', salt, iterations: rounds, hash: 'SHA-256' }, base, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
+}
+async function sealToken(token, pw, name) {
+  const salt = crypto.getRandomValues(new Uint8Array(16)), iv = crypto.getRandomValues(new Uint8Array(12));
+  const key = await pwKey(pw, salt);
+  const ct = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv, additionalData: new TextEncoder().encode(name) }, key, new TextEncoder().encode(token)));
+  return { kdf: 'PBKDF2-SHA256', rounds: KDF_ROUNDS, salt: u8b64(salt), iv: u8b64(iv), ct: u8b64(ct) };
+}
+async function openToken(u, pw) {
+  const key = await pwKey(pw, b64u8(u.salt), u.rounds || KDF_ROUNDS);
+  const pt = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: b64u8(u.iv), additionalData: new TextEncoder().encode(u.name) }, key, b64u8(u.ct));
+  return new TextDecoder().decode(pt);
+}
+// Read the published list of helpers (no token needed).
+async function loadAccessPublic() {
+  try {
+    const r = await fetch('users.json?v=' + Date.now(), { cache: 'no-store' });
+    if (!r.ok) return null;
+    const j = await r.json();
+    return j && Array.isArray(j.users) ? j : null;
+  } catch (e) { return null; }
+}
+// Owner: read and write users.json through the GitHub API (needs Contents access to the website repository).
+const siteFileUrl = () => `https://api.github.com/repos/${SITE.owner}/${SITE.repo}/contents/${SITE.path}`;
+async function accessRead() {
+  const r = await ghFetch(siteFileUrl() + '?ref=' + SITE.branch);
+  if (r.status === 404) return { json: { version: 1, users: [] }, sha: null };
+  if (r.status === 401) throw new GhError('auth');
+  if (r.status === 403) throw new GhError('siteperm');
+  if (!r.ok) throw new GhError('http', 'HTTP ' + r.status);
+  const j = await r.json();
+  let json; try { json = JSON.parse(b64dec(j.content)); } catch (e) { json = { version: 1, users: [] }; }
+  if (!Array.isArray(json.users)) json.users = [];
+  return { json, sha: j.sha };
+}
+async function accessWrite(json, sha, message) {
+  const body = { message: message + ` · by ${whoAmI()}`, content: b64enc(JSON.stringify(json, null, 1) + '\n'), branch: SITE.branch };
+  if (sha) body.sha = sha;
+  const r = await ghFetch(siteFileUrl(), { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  if (r.status === 401) throw new GhError('auth');
+  if (r.status === 403 || r.status === 404) throw new GhError('siteperm');
+  if (r.status === 409 || r.status === 422) throw new GhError('http', 'the helper list changed at the same time, try again');
+  if (!r.ok) throw new GhError('http', 'HTTP ' + r.status);
+}
+
+/* sign in screen */
+function showGate(note) {
+  document.body.classList.add('gated');
+  $('#loginGate').hidden = false; $('#ghPanel').hidden = true; $('#accountPanel').hidden = true; $('#usersPanel').hidden = true;
+  $('#loginNote').textContent = note || 'Sign in with the username and password you got from the lab owner.';
+  $('#loginMsg').textContent = '';
+  $('#storageBtn').hidden = true; $('#usersBtn').hidden = true;
+  setTimeout(() => { const u = $('#loginUser'); if (u && !u.value) u.focus(); }, 0);
+}
+function hideGate() { document.body.classList.remove('gated'); $('#loginGate').hidden = true; }
+$('#ownerConnect').addEventListener('click', () => { openGhPanel(); });
+$('#loginForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const name = $('#loginUser').value.trim().toLowerCase(), pw = $('#loginPass').value;
+  const msg = $('#loginMsg'), btn = $('#loginBtn');
+  if (!name || !pw) { msg.textContent = 'Enter your username and password.'; return; }
+  btn.disabled = true; msg.textContent = 'Signing in…';
+  try {
+    const access = await loadAccessPublic();
+    const u = access && access.users.find(x => x.name === name);
+    let token = null;
+    if (u) { try { token = await openToken(u, pw); } catch (err) { token = null; } }
+    if (!token) { msg.textContent = 'Wrong username or password.'; $('#loginPass').value = ''; $('#loginPass').focus(); return; }
+    const cfg = { ...access.data, token, role: 'helper', user: u.name, userId: u.id };
+    GH.cfg = cfg; GH.ops = new Map(); GH.msgs = [];
+    try { await ghPull(); }
+    catch (err) {
+      GH.cfg = null;
+      msg.textContent = err.kind === 'auth' ? 'Your login is correct, but the helper access has expired. Ask the lab owner to renew it.' : ghExplain(err);
+      return;
+    }
+    ghSaveCfg(cfg, $('#loginKeep').checked);
+    $('#loginPass').value = '';
+    S.mode = 'github'; S.ready = true;
+    hideGate(); ghView(); banner(null); setSync('saved'); renderAll();
+    toast(`Signed in as ${u.name}`);
+  } finally { btn.disabled = false; }
+});
+function signOut(note) {
+  ghSaveCfg(null); GH.cfg = null; GH.ops = new Map(); GH.msgs = []; GH.sha = null; GH.remote = { inventory: {}, loans: {} };
+  S.inv = new Map(); S.loans = new Map(); S.ready = false; S.mode = 'starting'; S.lastSaved = null; S.openLoan = null;
+  renderAll(); showGate(note);
+}
+function openAccountPanel() {
+  $('#accountText').innerHTML = `Signed in as <b>${esc(GH.cfg.user)}</b>. Changes you save are recorded under this name.`;
+  $('#accountMsg').textContent = '';
+  $('#accountPanel').hidden = false; $('#accountPanel').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+$('#accountClose').addEventListener('click', () => { $('#accountPanel').hidden = true; });
+$('#logoutBtn').addEventListener('click', () => {
+  if (GH.ops.size || GH.saving) { $('#accountMsg').textContent = 'Wait until all changes are saved, then sign out.'; return; }
+  $('#accountPanel').hidden = true; signOut('You are signed out.');
+});
+// A helper who was removed is signed out the next time the app opens.
+async function checkHelperStillAllowed() {
+  if (!isHelper()) return;
+  const access = await loadAccessPublic();
+  if (access && !access.users.some(u => u.id === GH.cfg.userId)) signOut('Your access was removed. Ask the lab owner if you need it again.');
+}
+
+/* owner: Helpers panel */
+S.helpers = { list: null, sha: null, busy: false, confirm: null, reset: null };
+async function openUsersPanel() {
+  $('#usersPanel').hidden = false; $('#ghPanel').hidden = true;
+  $('#usersPanel').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  $('#usersList').innerHTML = '<p class="sheet-note">Loading helpers…</p>';
+  renderHelperToken();
+  try { const a = await accessRead(); S.helpers.list = a.json; S.helpers.sha = a.sha; renderUsers(); }
+  catch (e) { $('#usersList').innerHTML = `<p class="sheet-note" style="color:var(--bad)">${esc(ghExplain(e))}</p>`; }
+}
+function renderHelperToken() {
+  const has = !!(GH.cfg && GH.cfg.helperToken);
+  $('#helperTokenBox').innerHTML = has
+    ? `<p class="sheet-note">Helper access token: <b>saved in this browser</b>. <button type="button" class="link-btn" id="htChange">Replace it</button></p>`
+    : `<div class="field" style="max-width:640px"><label for="htInput">Helper access token</label>
+        <input type="password" id="htInput" placeholder="github_pat_…" autocomplete="off">
+        <span class="hint">A second token just for helpers: on GitHub choose “Only select repositories” → <b>ict-lab-loan-data</b> only, Contents “Read and write”. Don't use your own token here.</span></div>
+       <div class="actions" style="margin-top:8px"><button type="button" class="btn" id="htSave">Save helper token</button></div>`;
+}
+function renderUsers() {
+  const users = (S.helpers.list && S.helpers.list.users) || [];
+  if (!users.length) { $('#usersList').innerHTML = '<p class="sheet-note">No helpers yet.</p>'; return; }
+  $('#usersList').innerHTML = `<div class="table-wrap"><table>
+    <thead><tr><th>Username</th><th>Added</th><th></th></tr></thead>
+    <tbody>${users.map(u => {
+      if (S.helpers.confirm === u.id) return `<tr class="confirm"><td colspan="2"><b>Remove ${esc(u.name)}?</b> They can't sign in any more.</td>
+        <td class="num"><div class="actions" style="justify-content:flex-end;flex-wrap:nowrap"><button class="btn small danger solid" type="button" data-hu="del-yes" data-id="${u.id}">Remove</button><button class="btn small" type="button" data-hu="cancel">Keep</button></div></td></tr>`;
+      if (S.helpers.reset === u.id) return `<tr><td colspan="2"><div class="actions"><b>${esc(u.name)}</b><input type="password" id="resetPass" placeholder="New password (12+ characters)" autocomplete="new-password" style="max-width:260px"></div></td>
+        <td class="num"><div class="actions" style="justify-content:flex-end;flex-wrap:nowrap"><button class="btn small primary" type="button" data-hu="reset-save" data-id="${u.id}">Save</button><button class="btn small" type="button" data-hu="cancel">Cancel</button></div></td></tr>`;
+      return `<tr><td class="dev-name">${esc(u.name)}</td><td>${fmtDate((u.created || '').slice(0, 10))}</td>
+        <td class="num"><div class="actions" style="justify-content:flex-end;flex-wrap:nowrap"><button class="btn small" type="button" data-hu="reset" data-id="${u.id}">New password</button><button class="btn small danger" type="button" data-hu="del" data-id="${u.id}">Remove</button></div></td></tr>`;
+    }).join('')}</tbody></table></div>`;
+  const rp = $('#resetPass'); if (rp) rp.focus();
+}
+function needHelperToken() {
+  if (GH.cfg && GH.cfg.helperToken) return GH.cfg.helperToken;
+  $('#usersMsg').textContent = 'Save the helper access token first.'; const i = $('#htInput'); if (i) i.focus();
+  return null;
+}
+async function saveUsers(mutate, message, okText) {
+  if (S.helpers.busy) return false;
+  S.helpers.busy = true; $('#usersMsg').textContent = 'Saving…';
+  try {
+    const a = await accessRead();                          // always start from the latest list
+    const json = a.json;
+    json.version = 1;
+    json.data = { owner: GH.cfg.owner, repo: GH.cfg.repo, branch: GH.cfg.branch, path: GH.cfg.path };
+    await mutate(json);
+    await accessWrite(json, a.sha, message);
+    S.helpers.list = json; S.helpers.confirm = null; S.helpers.reset = null;
+    renderUsers();
+    $('#usersMsg').textContent = okText + ' The website takes about a minute to update.';
+    return true;
+  } catch (e) { $('#usersMsg').textContent = e instanceof GhError ? ghExplain(e) : (e.message || 'Something went wrong.'); return false; }
+  finally { S.helpers.busy = false; }
+}
+function checkPassword(pw, pw2) {
+  if (pw.length < MIN_PW) return `Use at least ${MIN_PW} characters. A short sentence is easy to remember.`;
+  if (pw2 !== undefined && pw !== pw2) return 'The two passwords are different.';
+  return '';
+}
+$('#usersBtn').addEventListener('click', openUsersPanel);
+$('#usersClose').addEventListener('click', () => { $('#usersPanel').hidden = true; });
+$('#helperTokenBox').addEventListener('click', async e => {
+  if (e.target.id === 'htChange') { GH.cfg.helperToken = ''; renderHelperToken(); const i = $('#htInput'); if (i) i.focus(); return; }
+  if (e.target.id !== 'htSave') return;
+  const t = $('#htInput').value.trim();
+  if (!t) { $('#usersMsg').textContent = 'Paste the helper token first.'; return; }
+  if (t === GH.cfg.token) { $('#usersMsg').textContent = 'That is your own token. Create a separate token for helpers.'; return; }
+  $('#usersMsg').textContent = 'Checking the helper token…';
+  const check = await fetch(ghFileUrl() + '?ref=' + encodeURIComponent(GH.cfg.branch), { cache: 'no-store', headers: { Authorization: 'Bearer ' + t, Accept: 'application/vnd.github+json' } }).catch(() => null);
+  if (!check || !(check.ok || check.status === 404)) { $('#usersMsg').textContent = 'GitHub refused that token. Check that it can read and write ict-lab-loan-data.'; return; }
+  const hadUsers = !!(S.helpers.list && S.helpers.list.users.length);
+  GH.cfg.helperToken = t; ghSaveCfg(GH.cfg, true); renderHelperToken();
+  $('#usersMsg').textContent = hadUsers ? 'Helper token saved. Existing helpers still use the old token: give each of them a new password so they get the new one.' : 'Helper token saved. Now add a helper.';
+});
+$('#addUserForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const token = needHelperToken(); if (!token) return;
+  const name = $('#newUser').value.trim().toLowerCase(), pw = $('#newPass').value, pw2 = $('#newPass2').value;
+  if (!/^[a-z0-9._-]{2,32}$/.test(name)) { $('#usersMsg').textContent = 'Usernames use 2–32 letters, digits, dots, dashes or underscores.'; return; }
+  const bad = checkPassword(pw, pw2); if (bad) { $('#usersMsg').textContent = bad; return; }
+  const ok = await saveUsers(async json => {
+    if (json.users.some(u => u.name === name)) throw new Error(`There is already a helper called “${name}”.`);
+    json.users.push({ id: uid(), name, created: new Date().toISOString(), ...(await sealToken(token, pw, name)) });
+  }, `Add helper ${name}`, `Added ${name}.`);
+  if (ok) { $('#addUserForm').reset(); toast(`Helper ${name} added`); }
+});
+$('#usersList').addEventListener('click', async e => {
+  const b = e.target.closest('[data-hu]'); if (!b) return;
+  const id = b.dataset.id, users = (S.helpers.list && S.helpers.list.users) || [], u = users.find(x => x.id === id);
+  switch (b.dataset.hu) {
+    case 'del': S.helpers.confirm = id; S.helpers.reset = null; renderUsers(); break;
+    case 'reset': S.helpers.reset = id; S.helpers.confirm = null; renderUsers(); break;
+    case 'cancel': S.helpers.confirm = null; S.helpers.reset = null; renderUsers(); break;
+    case 'del-yes':
+      if (await saveUsers(async json => { json.users = json.users.filter(x => x.id !== id); }, `Remove helper ${u ? u.name : id}`, `Removed ${u ? u.name : 'the helper'}.`))
+        toast('Helper removed');
+      break;
+    case 'reset-save': {
+      const token = needHelperToken(); if (!token) return;
+      const pw = $('#resetPass').value, bad = checkPassword(pw); if (bad) { $('#usersMsg').textContent = bad; return; }
+      if (await saveUsers(async json => {
+        const t = json.users.find(x => x.id === id); if (!t) throw new Error('That helper no longer exists.');
+        Object.assign(t, await sealToken(token, pw, t.name));
+      }, `New password for ${u ? u.name : id}`, `New password saved for ${u ? u.name : 'the helper'}.`)) toast('Password changed');
+      break;
+    }
+  }
+});
 async function ghRefresh() {
   if (S.mode !== 'github' || GH.ops.size || GH.saving || Date.now() - GH.lastPull < 15000) return;
   try { await ghPull(); ghView(); renderAll(); if (GH.state === 'error') setSync('saved'); } catch (e) {}
@@ -682,12 +975,18 @@ async function startStorage() {
   while (inFrame && !(window.claude && window.claude.use) && tries < 15) { await new Promise(r => setTimeout(r, 100)); tries++; }
   if (!(window.claude && window.claude.use)) {
     const cfg = ghLoadCfg();
-    if (!cfg) { goLocal(); return; }
+    if (!cfg) {
+      // Not connected: if the owner has set up helper logins, ask for a sign-in; otherwise work in this browser only.
+      const access = await loadAccessPublic();
+      if (access && access.users.length && access.data) { showGate(); return; }
+      goLocal(); return;
+    }
     GH.cfg = cfg; S.mode = 'github'; setSync('loading'); renderAll();
-    try { await ghPull(); ghView(); S.ready = true; setSync('saved'); renderAll(); }
+    try { await ghPull(); ghView(); S.ready = true; banner(null); setSync('saved'); renderAll(); checkHelperStillAllowed(); }
     catch (e) {
+      if (cfg.role === 'helper' && e.kind === 'auth') { signOut('Your sign-in no longer works. Sign in again, or ask the lab owner.'); return; }
       S.ready = true; setSync('error'); renderAll();
-      banner('Could not load data from GitHub. ' + ghExplain(e), 'bad', { label: 'Check settings', run: openGhPanel });
+      banner('Could not load data from GitHub. ' + ghExplain(e), 'bad', cfg.role === 'helper' ? { label: 'Sign out', run: () => signOut() } : { label: 'Check settings', run: openGhPanel });
     }
     return;
   }
@@ -1155,7 +1454,7 @@ $('#loanForm').addEventListener('submit', async e => {
     ref: makeRef(start), names, group: $('#lnGroup').value.trim(), course: $('#lnCourse').value.trim(),
     contact: $('#lnContact').value.trim(), notes: $('#lnNotes').value.trim(), startDate: start, endDate: end,
     items: S.draft.map(d => ({ itemId: d.itemId, name: d.name, serial: d.serial, qty: d.qty, returnedQty: 0 })),
-    status: 'active', createdAt: new Date().toISOString(), returnedAt: null, returnNotes: ''
+    status: 'active', createdAt: new Date().toISOString(), returnedAt: null, returnNotes: '', createdBy: whoAmI()
   };
   $('#lnSave').disabled = true;
   const ok = await writeDoc('loans', id, loan);
@@ -1259,6 +1558,8 @@ function renderDetail() {
       ${l.returnedAt ? `<dt>Returned</dt><dd class="mono">${fmtDate(l.returnedAt)}</dd>` : ''}
       ${l.contact ? `<dt>Contact</dt><dd>${esc(l.contact)}</dd>` : ''}
       ${l.notes ? `<dt>Notes</dt><dd>${esc(l.notes)}</dd>` : ''}
+      ${l.createdBy ? `<dt>Lent by</dt><dd>${esc(l.createdBy)}</dd>` : ''}
+      ${l.lastCheckedBy ? `<dt>Checked by</dt><dd>${esc(l.lastCheckedBy)}${l.lastCheckedAt ? ` · ${fmtDate(l.lastCheckedAt.slice(0, 10))}` : ''}</dd>` : ''}
     </dl>
     <div class="actions" style="margin-top:12px"><button class="btn small" data-d="pdf">Download PDF</button><button class="btn small" data-d="xlsx">Download Excel</button><button class="btn small" data-d="print">Print</button>
       ${emailIn(l.contact) ? `<button class="btn small primary" data-d="email" title="Send the Excel record to ${esc(emailIn(l.contact))}">Email to borrower</button>` : `<button class="btn small" data-d="addemail">Add email</button>`}</div>
@@ -1320,7 +1621,7 @@ $('#loanDetail').addEventListener('click', async e => {
     case 'save': {
       const items = l.items.map((it, i) => ({ ...it, returnedQty: rd.qty[i] }));
       const complete = items.every(i => i.returnedQty >= i.qty);
-      const upd = { ...l, items, returnNotes: rd.notes.trim(), lastCheckedAt: new Date().toISOString(),
+      const upd = { ...l, items, returnNotes: rd.notes.trim(), lastCheckedAt: new Date().toISOString(), lastCheckedBy: whoAmI(),
         status: complete ? 'returned' : 'active', returnedAt: complete ? (l.returnedAt || todayISO()) : null };
       S.retDraft = null;
       if (await writeDoc('loans', l.id, upd)) {

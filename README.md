@@ -50,21 +50,40 @@ It keeps track of the lab's devices, records who has borrowed what, produces the
 
 ## Where the data is stored
 
-This repository only holds the app. **No student, loan or inventory data is stored here.** It is safe for this repository to be public:
-visitors only get an empty app that saves in their own browser.
+This repository only holds the app (and `users.json`, see Helpers below). **No student, loan or inventory data is stored here.** It is safe for this repository to be public:
+visitors without a login can't see or change any data.
 
 The app saves its data to a `data.json` file in a separate **private** repository (`SakibKhan-Karelia/ict-lab-loan-data`).
 Every change is a commit there, so the data repository also keeps a full history of who borrowed what and when.
 
-### Connecting a browser
+### Connecting a browser (owner)
 
 1. Create a fine-grained personal access token at <https://github.com/settings/personal-access-tokens/new>:
-   - Repository access: **Only select repositories**, then choose `ict-lab-loan-data`.
+   - Repository access: **Only select repositories**, then choose `ict-lab-loan-data` (and `ict-lab-loan-desk` if you use helper logins, see below).
    - Repository permissions: **Contents: Read and write**.
-2. Open the site, press **Set up GitHub storage**, paste the token and press **Connect**.
+2. Open the site, press **Set up GitHub storage** (or **Connect with your GitHub token** on the Sign in screen), paste the token and press **Connect**.
 3. The status at the bottom of the sidebar should say **Saved to GitHub**.
 
 The token is kept in that browser only. Do this once on each computer you use.
+
+### Helpers (username and password logins)
+
+One or two helpers can use the app in the owner's absence with a username and password. They don't need a GitHub account or token.
+
+**One-time setup (owner):**
+1. Edit your own token at <https://github.com/settings/personal-access-tokens> and add the repository **`ict-lab-loan-desk`** (Contents: Read and write), so the app can save the list of helpers.
+2. Create a **second** fine-grained token just for helpers, for example "Loan desk helpers": only `ict-lab-loan-data`, Contents: Read and write. It can't touch the website.
+3. In the app, press **Helpers** at the bottom of the sidebar, paste the helper token and press **Save helper token**.
+
+**Adding, changing and removing helpers:** in the **Helpers** panel, add a username and a password (at least 12 characters), give **New password**, or **Remove**. Changes reach the website in about a minute.
+
+**How helpers use it:** open the site, enter username and password, press **Sign in**. "Keep me signed in on this computer" keeps them signed in after the browser is closed; leave it off on shared computers. **Sign out** is under the status button at the bottom of the sidebar.
+
+**Who did what:** every change is saved with the name of the person who made it ("· by anna" in the data repository history), and each loan shows **Lent by** and **Checked by**.
+
+**How it works:** `users.json` in this repository holds, for each helper, the helper token encrypted with a key made from that helper's password (PBKDF2-SHA256, 600 000 rounds, AES-GCM). The plain helper token is only kept in the owner's browser.
+
+**If you no longer trust a helper:** remove them, then on GitHub delete the helper token and create a new one, paste it under **Helpers → Replace it**, and give the remaining helpers a **New password**.
 
 ### Keeping the data safe
 - Never share the token or put it in this repository.
@@ -82,6 +101,7 @@ Without a token the app still works, but saves only in that browser.
 | `index.html` | The page GitHub Pages serves. Generated from `loan-desk.html`, don't edit by hand. |
 | `build.mjs` | Builds `index.html` from `loan-desk.html`. |
 | `karelia-logo.png` | Logo shown in the sidebar. |
+| `users.json` | Helper logins (encrypted). Written by the app from the Helpers panel; don't edit by hand. Run `git pull` before pushing your own changes. |
 
 After changing `loan-desk.html`, rebuild and commit both files (needs [Node.js](https://nodejs.org/)):
 
@@ -103,6 +123,7 @@ The app uses [jsPDF](https://github.com/parallax/jsPDF) for PDF files and [Excel
 
 New features are listed here, newest first.
 
+- **2026-11-05**: Helper logins with username and password (Helpers panel, Sign in screen, Sign out); every change records who made it; loans show Lent by and Checked by. Default sort is Name A–Z.
 - **2026-11-04**: Checkboxes only appear after pressing Select; Select all / Deselect / Deselect all buttons.
 - **2026-11-04**: Selection bar with Select all, Export to Excel, Delete and Clear; Export moved from the page header into the bar; faster start-up.
 - **2026-11-04**: Select several devices to export or delete them together.
