@@ -2176,7 +2176,7 @@ attachSuggest($('#lnContact'), {
 });
 
 /* groups: the ICT groups, plus any other group typed before */
-const GROUPS = ['ICNS23', 'ICNS24', 'ICNS25', 'ICNS26'];
+const GROUPS = ['ICNS23', 'ICNS24', 'ICNS25', 'ICNS26', 'TITE/ICT Program Team'];
 function groupList() {
   const used = {}, extra = new Map();
   const note = g => { g = (g || '').trim(); if (!g) return null; const k = g.toUpperCase(); if (!extra.has(k)) extra.set(k, g); return k; };
