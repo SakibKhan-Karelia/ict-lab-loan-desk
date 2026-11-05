@@ -28,6 +28,8 @@ It keeps track of the lab's devices, records who has borrowed what, produces the
 - **Name and email suggestions**: start typing a name, an email or a student number. Matching people are listed: those who borrowed before first (marked "borrowed 2×" and so on), then everyone else on the borrower list. Use the mouse, or ↓ / ↑ and Enter. Picking one fills in the name and email, and the group and course if they are empty.
 - **Import student list** (top of the Borrower box): choose an Excel file (.xlsx) or a CSV with "Full name" (or "First name" and "Last name"), "Email address" and optionally "Username" columns, for example a Moodle completion progress or participants export. In an Excel file the first sheet with those columns is used. Everyone in it is added to the suggestions. Import again whenever there are new students; people already on the list are updated, nobody is removed. System accounts are skipped, and if someone appears twice (a private and a school email) the school email is kept.
 - **New borrowers are added automatically**: when a loan is saved for a name or email that is not on the borrower list yet, that person is added (marked as "added"). For people already on the list, the latest group, course and contact are kept.
+- **Remove someone from the borrower list**: press the **×** next to a name in the suggestions (or highlight it with ↓ / ↑ and press Delete), then **Remove**. Their loans are kept; the removal is listed on the History page. Importing a list again brings them back if they are in it.
+- **Group suggestions**: click the Group box to see ICNS23, ICNS24, ICNS25 and ICNS26, or type to filter. Other groups typed in earlier loans are suggested too.
 - **Course suggestions**: type a course name or code (for example "iot" or "IC10028") to pick a course from the ICT curriculum. Courses typed in earlier loans are suggested too.
 - The end date can't be before the start date. Moving the start date past the end date moves the end date to two weeks after the start.
 - Pick devices from the inventory with number and serial number. You can't lend more than is available.
@@ -149,6 +151,7 @@ The app uses [jsPDF](https://github.com/parallax/jsPDF) for PDF files and [Excel
 
 New features are listed here, newest first.
 
+- **2026-11-05**: Group suggestions (ICNS23–ICNS26); × in the name suggestions to remove someone from the borrower list.
 - **2026-11-05**: Data split into `inventory.json`, `loans.json`, `borrowers.json` and `history.json` (moved automatically from `data.json`, `people.json` and `directory.json`); one borrower list for imported and typed-in people; new names and emails typed into a loan are added to the borrower list.
 - **2026-11-05**: Import student list also accepts Excel (.xlsx) files.
 - **2026-11-05**: Import student list (Moodle CSV) into `directory.json` for name and email suggestions; search by student number; course suggestions from the ICT curriculum; end date can't be before the start date; wider In stock box.
