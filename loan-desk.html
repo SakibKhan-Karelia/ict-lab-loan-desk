@@ -308,7 +308,6 @@ tr.confirm td{background:var(--bad-soft)}
       <!-- HELPERS (owner) -->
       <section id="usersPanel" class="panel" hidden style="margin-bottom:20px">
         <div class="panel-head"><h2>Users</h2><button class="btn small" type="button" id="usersClose">Close</button></div>
-        <p class="sheet-note" style="max-width:80ch">Users sign in with a username and password. They can use the whole app: inventory, loans and return checks. They can't manage users. Every change they save shows their username.</p>
         <div id="helperTokenBox" style="margin-top:14px"></div>
         <div id="usersList" style="margin-top:14px"></div>
         <form class="form" id="addUserForm" autocomplete="off" style="margin-top:16px">
@@ -829,8 +828,7 @@ function renderHelperToken() {
   $('#helperTokenBox').innerHTML = has
     ? `<p class="sheet-note">User access token: <b>saved in this browser</b>. <button type="button" class="link-btn" id="htChange">Replace it</button></p>`
     : `<div class="field" style="max-width:640px"><label for="htInput">User access token</label>
-        <input type="password" id="htInput" placeholder="github_pat_…" autocomplete="off">
-        <span class="hint">A second token just for users: on GitHub choose “Only select repositories” → <b>ict-lab-loan-data</b> only, Contents “Read and write”. Don't use your own token here.</span></div>
+        <input type="password" id="htInput" placeholder="github_pat_…" autocomplete="off"></div>
        <div class="actions" style="margin-top:8px"><button type="button" class="btn" id="htSave">Save user token</button></div>`;
 }
 function renderUsers() {

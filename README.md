@@ -69,10 +69,14 @@ The token is kept in that browser only. Do this once on each computer you use.
 ### Users (username and password logins)
 
 One or two users can use the app in the owner's absence with a username and password. They don't need a GitHub account or token.
+Users can use the whole app: inventory, loans and return checks. They can't manage users. Every change they save shows their username.
 
 **One-time setup (owner):**
 1. Edit your own token at <https://github.com/settings/personal-access-tokens> and add the repository **`ict-lab-loan-desk`** (Contents: Read and write), so the app can save the list of users.
-2. Create a **second** fine-grained token just for users, for example "Loan desk users": only `ict-lab-loan-data`, Contents: Read and write. It can't touch the website.
+2. Create a **second** fine-grained token just for users, for example "Loan desk users", at <https://github.com/settings/personal-access-tokens/new>:
+   - Repository access: **Only select repositories**, then **`ict-lab-loan-data` only**.
+   - Repository permissions: **Contents: Read and write**.
+   - Don't use your own token for this. The user token can't touch the website.
 3. In the app, press **Users** at the bottom of the sidebar, paste the user token and press **Save user token**.
 
 **Adding, changing and removing users:** in the **Users** panel, add a username and a password (at least 12 characters), give **New password**, or **Remove**. Changes reach the website in about a minute.
