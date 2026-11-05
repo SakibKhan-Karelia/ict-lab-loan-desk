@@ -213,8 +213,8 @@ tr.confirm td{background:var(--bad-soft)}
 /* new loan */
 .loan-grid{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,7fr);gap:20px;align-items:start}
 @media (max-width:1100px){.loan-grid{grid-template-columns:minmax(0,1fr)}}
-.picker{display:grid;grid-template-columns:minmax(0,2fr) 84px minmax(0,1.3fr) auto;gap:10px;align-items:end;padding:14px 18px;border-bottom:1px solid var(--line);background:var(--sunken)}
-@media (max-width:640px){.picker{grid-template-columns:minmax(0,1fr) 84px}.picker .field:nth-child(3){grid-column:1/-1}.picker .btn{grid-column:1/-1;justify-content:center}}
+.picker{display:grid;grid-template-columns:minmax(0,2fr) 140px minmax(0,1.3fr) auto;gap:10px;align-items:end;padding:14px 18px;border-bottom:1px solid var(--line);background:var(--sunken)}
+@media (max-width:640px){.picker{grid-template-columns:minmax(0,1fr) 140px}.picker .field:nth-child(3){grid-column:1/-1}.picker .btn{grid-column:1/-1;justify-content:center}}
 .form-foot{display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:flex-end;padding:14px 18px;border-top:1px solid var(--line)}
 .saved{border:1px solid color-mix(in srgb,var(--ok) 40%,var(--line));background:var(--ok-soft);border-radius:4px;padding:14px 18px;display:grid;gap:10px}
 
@@ -226,7 +226,28 @@ tr.confirm td{background:var(--bad-soft)}
 .dl{display:grid;grid-template-columns:auto minmax(0,1fr);gap:4px 16px;margin:0}
 .dl dt{color:var(--muted)}
 .dl dd{margin:0;overflow-wrap:anywhere}
-.ret-input{width:60px;text-align:center;padding:3px 6px}
+.ret-input{width:52px;text-align:center;padding:3px 6px}
+/* number boxes: our own − / + buttons instead of the browser's small arrows */
+input[type=number]{-moz-appearance:textfield;appearance:textfield}
+input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+.num-step{display:flex;align-items:stretch;gap:4px}
+.num-step input{text-align:center;flex:1;min-width:40px}
+.num-step .icon{flex:none;width:32px;height:auto;min-height:34px}
+/* name and email suggestions */
+.has-suggest{position:relative}
+.suggest{position:absolute;left:0;right:0;top:100%;margin-top:3px;background:var(--surface);border:1px solid var(--line-strong);border-radius:4px;box-shadow:0 10px 28px rgba(0,0,0,.16);z-index:15;max-height:300px;overflow:auto;padding:4px 0}
+.sg-head{padding:4px 12px 6px;font-size:.78rem;color:var(--muted);border-bottom:1px solid var(--line);margin-bottom:3px}
+.sg-item{padding:7px 12px;cursor:pointer;display:grid;gap:1px;border-left:3px solid transparent}
+.sg-item.on,.sg-item:hover{background:var(--sunken);border-left-color:var(--accent)}
+.sg-main{font-weight:600}
+.sg-sub{font-size:.84rem;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.suggest mark{background:none;color:inherit;text-decoration:underline;text-decoration-color:var(--accent);text-decoration-thickness:2px;text-underline-offset:2px}
+/* history */
+.toolbar select{width:auto}
+.hist-when{white-space:nowrap;font-variant-numeric:tabular-nums}
+.hist-act{white-space:nowrap;font-weight:600}
+.hist-who{white-space:nowrap}
+.hist-more{padding:12px 18px;display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;border-top:1px solid var(--line)}
 .ret-row.done td{color:var(--ok)}
 .ret-row.miss td:first-child{box-shadow:inset 3px 0 0 var(--warn)}
 
@@ -246,6 +267,7 @@ tr.confirm td{background:var(--bad-soft)}
       <button id="tab-inventory" role="tab" data-view="inventory" aria-selected="true">Inventory <span class="count" id="invCount"></span></button>
       <button id="tab-new" role="tab" data-view="new" aria-selected="false">New loan</button>
       <button id="tab-loans" role="tab" data-view="loans" aria-selected="false">Loans <span id="loanBadge" class="count" hidden></span></button>
+      <button id="tab-history" role="tab" data-view="history" aria-selected="false">History</button>
     </nav>
     <dl class="side-stats" id="stats"></dl>
     <div class="tools">
@@ -354,7 +376,7 @@ tr.confirm td{background:var(--bad-soft)}
             <div class="field"><label for="invName">Device / component name</label><input type="text" id="invName" required placeholder="e.g. Raspberry Pi 4 Model B"></div>
             <div class="field"><div class="label-row"><label for="invCat">Category</label><button type="button" class="link-btn" id="catManage" aria-controls="catPanel" aria-expanded="false">Manage</button></div><input type="text" id="invCat" list="catList" placeholder="e.g. Microcontrollers"><datalist id="catList"></datalist></div>
             <div class="field"><label for="invSerial">Serial / asset no.</label><input type="text" id="invSerial" placeholder="Optional"></div>
-            <div class="field"><label for="invTotal">In stock</label><input type="number" id="invTotal" min="0" step="1" value="1" required></div>
+            <div class="field"><label for="invTotal">In stock</label><div class="num-step"><button type="button" class="icon" data-step="-1" aria-label="One less">−</button><input type="number" id="invTotal" min="0" step="1" value="1" inputmode="numeric" required><button type="button" class="icon" data-step="1" aria-label="One more">+</button></div></div>
             <div class="field"><label for="invNotes">Notes</label><input type="text" id="invNotes" placeholder="Shelf, condition, accessories…"></div>
             <div class="actions">
               <button type="submit" class="btn primary" id="invSubmit">Add to inventory</button>
@@ -396,7 +418,7 @@ tr.confirm td{background:var(--bad-soft)}
             <div class="box-head"><h2>Equipment</h2><span class="sheet-note">The paper record fits 10 lines per page.</span></div>
             <div class="picker">
               <div class="field"><label for="pkItem">Device</label><select id="pkItem"></select></div>
-              <div class="field"><label for="pkQty">Number</label><input type="number" id="pkQty" min="1" step="1" value="1"></div>
+              <div class="field"><label for="pkQty">Number</label><div class="num-step"><button type="button" class="icon" data-step="-1" aria-label="One less">−</button><input type="number" id="pkQty" min="1" step="1" value="1" inputmode="numeric"><button type="button" class="icon" data-step="1" aria-label="One more">+</button></div></div>
               <div class="field"><label for="pkSerial">Serial number</label><input type="text" id="pkSerial" placeholder="Optional"></div>
               <button type="button" class="btn accent" id="pkAdd">Add to loan</button>
             </div>
@@ -427,6 +449,22 @@ tr.confirm td{background:var(--bad-soft)}
           <div class="box" id="loanTable"></div>
           <aside class="panel detail" id="loanDetail" aria-live="polite"></aside>
         </div>
+      </section>
+
+      <!-- HISTORY -->
+      <section id="view-history" class="view" role="tabpanel" aria-labelledby="tab-history" hidden>
+        <div class="page-head">
+          <h1>History</h1>
+          <div class="toolbar">
+            <select id="histType" aria-label="Type of change">
+              <option value="">All changes</option>
+              <option value="inventory">Inventory</option>
+              <option value="loan">Loans</option>
+            </select>
+            <input type="search" id="histSearch" placeholder="Search history" aria-label="Search history">
+          </div>
+        </div>
+        <div class="box" id="histTable"></div>
       </section>
     </main>
   </div>
@@ -481,7 +519,8 @@ applyTheme();
 
 /* ---------- storage ---------- */
 const S = {
-  inv: new Map(), loans: new Map(), mode: 'starting', db: null, ready: false,
+  inv: new Map(), loans: new Map(), hist: new Map(), people: new Map(), mode: 'starting', db: null, ready: false,
+  histQuery: '', histType: '', histLimit: 100,
   view: 'inventory', invQuery: '', editingId: null, pendingDel: null,
   draft: [], lastSaved: null,
   loanFilter: 'open', loanQuery: '', openLoan: null, retDraft: null, pendingLoanDel: false,
@@ -492,12 +531,14 @@ function loadLocal() {
     const j = JSON.parse(localStorage.getItem(LS_KEY) || '{}');
     S.inv = new Map(Object.entries(j.inventory || {}).map(([k, v]) => [k, { ...v, id: k }]));
     S.loans = new Map(Object.entries(j.loans || {}).map(([k, v]) => [k, { ...v, id: k }]));
+    S.hist = new Map(Object.entries(j.history || {}).map(([k, v]) => [k, { ...v, id: k }]));
+    S.people = new Map(Object.entries(j.people || {}).map(([k, v]) => [k, { ...v, id: k }]));
   } catch (e) {}
 }
 function saveLocal() {
   try {
     const strip = m => Object.fromEntries([...m].map(([k, v]) => { const o = { ...v }; delete o.id; return [k, o]; }));
-    localStorage.setItem(LS_KEY, JSON.stringify({ inventory: strip(S.inv), loans: strip(S.loans) }));
+    localStorage.setItem(LS_KEY, JSON.stringify({ inventory: strip(S.inv), loans: strip(S.loans), history: strip(S.hist), people: strip(S.people) }));
   } catch (e) {}
 }
 function writeErr(e) {
@@ -508,7 +549,11 @@ function writeErr(e) {
 }
 /* ---------- GitHub storage (used outside the Claude viewer, e.g. on GitHub Pages) ---------- */
 const GH_KEY = 'ict-lab-loan-desk-github';
-const GH = { cfg: null, sha: null, remote: { inventory: {}, loans: {} }, ops: new Map(), msgs: [], timer: null, saving: false, again: false, state: 'idle', lastPull: 0 };
+const GH = { cfg: null, head: null, remote: emptyData(), ops: new Map(), msgs: [], timer: null, saving: false, again: false, state: 'idle', lastPull: 0 };
+// The data repository holds three files: data.json (inventory and loans), history.json (every change) and people.json (borrowers for suggestions).
+const FILE_COLS = { data: ['inventory', 'loans'], history: ['history'], people: ['people'] };
+const HIST_MAX = 20000;
+function emptyData() { return { inventory: {}, loans: {}, history: {}, people: {} }; }
 function ghLoadCfg() {
   for (const store of [() => localStorage, () => sessionStorage]) {
     try { const v = store().getItem(GH_KEY); if (v) return JSON.parse(v); } catch (e) {}
@@ -528,7 +573,14 @@ const b64enc = s => { const b = new TextEncoder().encode(s); let bin = ''; for (
 const b64dec = s => new TextDecoder().decode(Uint8Array.from(atob(String(s).replace(/\s/g, '')), c => c.charCodeAt(0)));
 function ghHeaders() { return { Authorization: 'Bearer ' + GH.cfg.token, Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' }; }
 const ghRepoUrl = () => `https://api.github.com/repos/${encodeURIComponent(GH.cfg.owner)}/${encodeURIComponent(GH.cfg.repo)}`;
-const ghFileUrl = () => ghRepoUrl() + '/contents/' + GH.cfg.path.split('/').map(encodeURIComponent).join('/');
+const ghContentsUrl = path => ghRepoUrl() + '/contents/' + path.split('/').map(encodeURIComponent).join('/');
+const ghFileUrl = () => ghContentsUrl(GH.cfg.path);
+const ghBranchPath = () => GH.cfg.branch.split('/').map(encodeURIComponent).join('/');
+const ghRefUrl = () => ghRepoUrl() + '/git/refs/heads/' + ghBranchPath();
+function ghPathOf(f) {
+  const p = GH.cfg.path; if (f === 'data') return p;
+  const i = p.lastIndexOf('/'); return (i >= 0 ? p.slice(0, i + 1) : '') + f + '.json';
+}
 class GhError extends Error { constructor(kind, msg) { super(msg); this.kind = kind; } }
 function ghExplain(e) {
   const kind = e && e.kind;
@@ -542,32 +594,58 @@ async function ghFetch(url, opts = {}) {
   try { return await fetch(url, { cache: 'no-store', ...opts, headers: { ...ghHeaders(), ...(opts.headers || {}) } }); }
   catch (e) { throw new GhError('net', e.message); }
 }
-function normalizeData(j) { return { inventory: (j && j.inventory) || {}, loans: (j && j.loans) || {} }; }
-async function ghPull() {
-  const r = await ghFetch(ghFileUrl() + '?ref=' + encodeURIComponent(GH.cfg.branch));
-  if (r.status === 401) throw new GhError('auth');
-  if (r.status === 404) {
-    const rr = await ghFetch(ghRepoUrl());
-    if (rr.status === 401) throw new GhError('auth');
-    if (!rr.ok) throw new GhError('repo');
-    GH.sha = null; GH.remote = normalizeData(null); GH.lastPull = Date.now(); return;
-  }
-  if (r.status === 403) throw new GhError('auth');
+const ghSend = (method, url, body) => ghFetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+function ghCheck(r) {
+  if (r.status === 401 || r.status === 403) throw new GhError('auth');
   if (!r.ok) throw new GhError('http', 'HTTP ' + r.status);
+  return r;
+}
+// history.json and people.json are lists (one entry per line) so they are easy to read on GitHub.
+const listToObj = list => { const o = {}; for (const e of list || []) if (e && e.id) { const v = { ...e }; delete v.id; o[e.id] = v; } return o; };
+const objToList = o => Object.entries(o || {}).map(([id, v]) => ({ id, ...v }));
+const asObj = v => Array.isArray(v) ? listToObj(v) : (v && typeof v === 'object' ? v : {});
+function parseFile(f, j) {
+  if (f === 'history') return { history: asObj(j && j.history) };
+  if (f === 'people') return { people: asObj(j && j.people) };
+  return { inventory: (j && j.inventory) || {}, loans: (j && j.loans) || {} };
+}
+function fileText(f, d) {
+  const lines = (about, key, list) => `{\n "about": ${JSON.stringify(about)},\n "${key}": [\n${list.map(e => '  ' + JSON.stringify(e)).join(',\n')}\n ]\n}\n`;
+  if (f === 'history') return lines('ICT Lab Loan Desk: every change, newest first', 'history',
+    objToList(d.history).sort((a, b) => (b.at || '').localeCompare(a.at || '')).slice(0, HIST_MAX));
+  if (f === 'people') return lines('ICT Lab Loan Desk: borrowers, used for name and email suggestions in New loan', 'people',
+    objToList(d.people).sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base' })));
+  return JSON.stringify({ inventory: d.inventory, loans: d.loans }, null, 1);
+}
+async function ghGetFile(path, ref) {
+  const r = await ghFetch(ghContentsUrl(path) + '?ref=' + encodeURIComponent(ref));
+  if (r.status === 404) return null;
+  ghCheck(r);
   const j = await r.json();
   let text = j.content ? b64dec(j.content) : '';
   if (!text && j.sha && j.size) { // files over 1 MB come without inline content
-    const br = await ghFetch(ghRepoUrl() + '/git/blobs/' + j.sha);
-    if (!br.ok) throw new GhError('http', 'HTTP ' + br.status);
+    const br = ghCheck(await ghFetch(ghRepoUrl() + '/git/blobs/' + j.sha));
     text = b64dec((await br.json()).content);
   }
-  GH.sha = j.sha;
-  try { GH.remote = normalizeData(text ? JSON.parse(text) : null); }
-  catch (e) { throw new GhError('http', 'the data file is not valid JSON'); }
-  GH.lastPull = Date.now();
+  if (!text.trim()) return null;
+  try { return JSON.parse(text); } catch (e) { throw new GhError('http', path + ' is not valid JSON'); }
+}
+async function ghPull() {
+  const r = await ghFetch(ghRepoUrl() + '/git/ref/heads/' + ghBranchPath());
+  if (r.status === 401 || r.status === 403) throw new GhError('auth');
+  if (r.status === 404 || r.status === 409) { // empty repository, or the branch does not exist yet
+    const rr = await ghFetch(ghRepoUrl());
+    if (rr.status === 401) throw new GhError('auth');
+    if (!rr.ok) throw new GhError('repo');
+    GH.head = null; GH.remote = emptyData(); GH.lastPull = Date.now(); return;
+  }
+  ghCheck(r);
+  const head = (await r.json()).object.sha;
+  const parts = await Promise.all(Object.keys(FILE_COLS).map(f => ghGetFile(ghPathOf(f), head).then(j => parseFile(f, j))));
+  GH.head = head; GH.remote = Object.assign(emptyData(), ...parts); GH.lastPull = Date.now();
 }
 function ghApply(base, ops) {
-  const next = { inventory: { ...base.inventory }, loans: { ...base.loans } };
+  const next = {}; for (const c of Object.keys(emptyData())) next[c] = { ...base[c] };
   for (const [k, v] of ops) { const [col, id] = k.split('/'); if (v === null) delete next[col][id]; else next[col][id] = v; }
   return next;
 }
@@ -575,18 +653,42 @@ function ghView() {
   const d = ghApply(GH.remote, GH.ops);
   S.inv = new Map(Object.entries(d.inventory).map(([k, v]) => [k, { ...v, id: k }]));
   S.loans = new Map(Object.entries(d.loans).map(([k, v]) => [k, { ...v, id: k }]));
+  S.hist = new Map(Object.entries(d.history).map(([k, v]) => [k, { ...v, id: k }]));
+  S.people = new Map(Object.entries(d.people).map(([k, v]) => [k, { ...v, id: k }]));
 }
 function ghDescribe(col, id, body) {
-  if (body === null) { const old = (col === 'inventory' ? S.inv : S.loans).get(id); return `Delete ${col === 'inventory' ? 'device' : 'loan'} ${old ? (old.name || old.names || id) : id}`; }
+  if (body === null) { const old = colMap(col).get(id); return `Delete ${col === 'inventory' ? 'device' : 'loan'} ${old ? (old.name || old.names || id) : id}`; }
   return col === 'inventory' ? `Inventory: ${body.name}` : `Loan ${body.ref || ''}: ${body.names}${body.status === 'returned' ? ' (returned)' : ''}`;
 }
 function ghQueue(col, id, body) {
-  GH.msgs.push(ghDescribe(col, id, body));
+  if (col === 'inventory' || col === 'loans') GH.msgs.push(ghDescribe(col, id, body));
   GH.ops.set(col + '/' + id, body);
   ghView(); renderAll();
   setSync('pending');
   clearTimeout(GH.timer); GH.timer = setTimeout(ghSave, 900);
   return Promise.resolve(true);
+}
+// One commit for all changed files. Returns false when someone else saved first (then we reload and try again).
+async function ghCommit(files, message) {
+  if (!GH.head) { // empty repository: the Contents API can create the first files
+    for (const f of files) {
+      const body = { message, content: b64enc(f.text), branch: GH.cfg.branch };
+      let r = await ghSend('PUT', ghContentsUrl(f.path), body);
+      if (!r.ok && (r.status === 404 || r.status === 422)) { delete body.branch; r = await ghSend('PUT', ghContentsUrl(f.path), body); }
+      if (r.status === 409 || r.status === 422) return false;
+      ghCheck(r);
+    }
+    return true;
+  }
+  const c = await (ghCheck(await ghFetch(ghRepoUrl() + '/git/commits/' + GH.head))).json();
+  const tree = await (ghCheck(await ghSend('POST', ghRepoUrl() + '/git/trees',
+    { base_tree: c.tree.sha, tree: files.map(f => ({ path: f.path, mode: '100644', type: 'blob', content: f.text })) }))).json();
+  const commit = await (ghCheck(await ghSend('POST', ghRepoUrl() + '/git/commits', { message, tree: tree.sha, parents: [GH.head] }))).json();
+  const u = await ghSend('PATCH', ghRefUrl(), { sha: commit.sha, force: false });
+  if (u.status === 409 || u.status === 422) return false;
+  ghCheck(u);
+  GH.head = commit.sha;
+  return true;
 }
 async function ghSave() {
   if (GH.saving) { GH.again = true; return; }
@@ -594,30 +696,25 @@ async function ghSave() {
   GH.saving = true; setSync('saving');
   const ops = new Map(GH.ops), nMsgs = GH.msgs.length;
   const who = whoAmI();
-  const message = GH.msgs[0] + (nMsgs > 1 ? ` (+${nMsgs - 1} more change${nMsgs > 2 ? 's' : ''})` : '') + (who ? ` · by ${who}` : '');
+  const first = GH.msgs[0] || 'Update history';
+  const message = first + (nMsgs > 1 ? ` (+${nMsgs - 1} more change${nMsgs > 2 ? 's' : ''})` : '') + (who ? ` · by ${who}` : '');
+  const touched = new Set([...ops.keys()].map(k => k.split('/')[0]));
   try {
     let done = false;
-    for (let attempt = 0; attempt < 3 && !done; attempt++) {
+    for (let attempt = 0; attempt < 4 && !done; attempt++) {
       const next = ghApply(GH.remote, ops);
-      const body = { message, content: b64enc(JSON.stringify(next, null, 1)), branch: GH.cfg.branch };
-      if (GH.sha) body.sha = GH.sha;
-      let r = await ghFetch(ghFileUrl(), { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-      if (!r.ok && !GH.sha && (r.status === 404 || r.status === 422)) { // empty repository: let GitHub create the default branch
-        delete body.branch;
-        r = await ghFetch(ghFileUrl(), { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-      }
-      if (r.ok) {
-        const j = await r.json();
-        GH.sha = j.content.sha; GH.remote = next; GH.lastPull = Date.now();
+      const files = Object.entries(FILE_COLS).filter(([, cols]) => cols.some(c => touched.has(c))).map(([f]) => ({ path: ghPathOf(f), text: fileText(f, next) }));
+      const wasEmpty = !GH.head;
+      if (await ghCommit(files, message)) {
+        GH.remote = next; GH.lastPull = Date.now();
+        if (wasEmpty) await ghPull();
         for (const [k, v] of ops) if (GH.ops.get(k) === v) GH.ops.delete(k);
         GH.msgs = GH.msgs.slice(nMsgs);
         done = true; break;
       }
-      if (r.status === 401 || r.status === 403) throw new GhError('auth');
-      if (r.status === 409 || r.status === 422) { await ghPull(); continue; } // someone else saved first: merge onto the latest file
-      throw new GhError('http', 'HTTP ' + r.status);
+      await ghPull(); // someone else saved first: merge onto the latest files
     }
-    if (!done) throw new GhError('http', 'the file kept changing while saving');
+    if (!done) throw new GhError('http', 'the files kept changing while saving');
     ghView(); renderAll();
     setSync(GH.ops.size ? 'pending' : 'saved');
   } catch (e) {
@@ -792,8 +889,8 @@ $('#loginForm').addEventListener('submit', async e => {
   } finally { btn.disabled = false; }
 });
 function signOut(note) {
-  ghSaveCfg(null); GH.cfg = null; GH.ops = new Map(); GH.msgs = []; GH.sha = null; GH.remote = { inventory: {}, loans: {} };
-  S.inv = new Map(); S.loans = new Map(); S.ready = false; S.mode = 'starting'; S.lastSaved = null; S.openLoan = null;
+  ghSaveCfg(null); GH.cfg = null; GH.ops = new Map(); GH.msgs = []; GH.head = null; GH.remote = emptyData();
+  S.inv = new Map(); S.loans = new Map(); S.hist = new Map(); S.people = new Map(); S.ready = false; S.mode = 'starting'; S.lastSaved = null; S.openLoan = null;
   renderAll(); showGate(note);
 }
 function openAccountPanel() {
@@ -930,10 +1027,12 @@ window.addEventListener('focus', ghRefresh);
 document.addEventListener('visibilitychange', () => { if (!document.hidden) ghRefresh(); });
 
 const chains = {};
-function writeDoc(col, id, data) {
-  const map = col === 'inventory' ? S.inv : S.loans;
+const colMap = col => ({ inventory: S.inv, loans: S.loans, history: S.hist, people: S.people })[col];
+function writeDoc(col, id, data, before) {
+  const map = colMap(col);
   const body = { ...data }; delete body.id;
   if (!S.ready) { toast('Still loading your data. Try again in a moment.', 'bad'); return Promise.resolve(false); }
+  logChange(col, before !== undefined ? before : map.get(id), body);
   if (S.mode === 'github') return ghQueue(col, id, body);
   if (S.mode !== 'db') { map.set(id, { ...body, id }); saveLocal(); renderAll(); return Promise.resolve(true); }
   const key = col + '/' + id;
@@ -942,7 +1041,8 @@ function writeDoc(col, id, data) {
   return p.then(() => true, e => { toast(writeErr(e), 'bad'); return false; });
 }
 function deleteDoc(col, id) {
-  const map = col === 'inventory' ? S.inv : S.loans;
+  const map = colMap(col);
+  logChange(col, map.get(id), null);
   if (S.mode === 'github') return ghQueue(col, id, null);
   if (S.mode !== 'db') { map.delete(id); saveLocal(); renderAll(); return Promise.resolve(true); }
   const key = col + '/' + id;
@@ -950,6 +1050,66 @@ function deleteDoc(col, id) {
   chains[key] = p;
   return p.then(() => true, e => { toast(writeErr(e), 'bad'); return false; });
 }
+
+/* ---------- history: one entry for every change to devices and loans ---------- */
+function describeChange(col, old, body) {
+  if (col === 'inventory') {
+    const name = (body || old || {}).name || 'Device';
+    if (!body) return { action: 'Device deleted', text: name + (old ? ` (${old.total || 0} in stock)` : '') };
+    if (!old) return { action: 'Device added', text: `${name}: ${body.total || 0} in stock${body.category ? ' · ' + body.category : ''}` };
+    const parts = [];
+    if ((old.name || '') !== (body.name || '')) parts.push(`renamed from “${old.name}”`);
+    if ((old.total || 0) !== (body.total || 0)) parts.push(`stock ${old.total || 0} → ${body.total || 0}`);
+    if ((old.category || '') !== (body.category || '')) parts.push(`category ${old.category || '–'} → ${body.category || '–'}`);
+    if ((old.serial || '') !== (body.serial || '')) parts.push('serial number changed');
+    if ((old.notes || '') !== (body.notes || '')) parts.push('notes changed');
+    if (!parts.length) return null;
+    return { action: parts.length === 1 && parts[0].startsWith('stock') ? 'Stock changed' : 'Device edited', text: `${name}: ${parts.join(', ')}` };
+  }
+  if (col !== 'loans') return null;
+  const l = body || old || {}, head = `${l.ref || ''} ${l.names || ''}`.trim();
+  const units = it => (it || []).reduce((a, i) => a + (i.qty || 0), 0), back = it => (it || []).reduce((a, i) => a + (i.returnedQty || 0), 0);
+  if (!body) return { action: 'Loan deleted', text: head };
+  if (!old) return { action: 'Loan created', text: `${head}: ${(body.items || []).map(i => `${i.qty} × ${i.name}`).join(', ')}; due ${fmtDate(body.endDate)}` };
+  if (old.status !== 'returned' && body.status === 'returned') return { action: 'Loan returned', text: `${head}: all ${units(body.items)} unit(s) back` };
+  if (old.status === 'returned' && body.status !== 'returned') return { action: 'Loan reopened', text: `${head}: ${back(body.items)} of ${units(body.items)} back` };
+  if (back(old.items) !== back(body.items)) return { action: 'Return check', text: `${head}: ${back(body.items)} of ${units(body.items)} back` };
+  if ((old.contact || '') !== (body.contact || '')) return { action: 'Contact changed', text: `${head}: ${body.contact || '–'}` };
+  if ((old.returnNotes || '') !== (body.returnNotes || '')) return { action: 'Return notes', text: `${head}: ${body.returnNotes || '–'}` };
+  if (old.lastCheckedAt !== body.lastCheckedAt) return { action: 'Return check', text: `${head}: ${back(body.items)} of ${units(body.items)} back` };
+  return { action: 'Loan edited', text: head };
+}
+function logChange(col, old, body) {
+  if (col !== 'inventory' && col !== 'loans') return;
+  const d = describeChange(col, old, body); if (!d) return;
+  writeDoc('history', uid(), { at: new Date().toISOString(), by: whoAmI(), type: col === 'inventory' ? 'inventory' : 'loan', action: d.action, text: d.text });
+}
+
+/* ---------- people: borrowers remembered for name and email suggestions ---------- */
+const personKey = n => String(n || '').trim().toLowerCase().replace(/\s+/g, ' ');
+function personId(n) { let h = 2166136261; for (const ch of personKey(n)) { h ^= ch.codePointAt(0); h = Math.imul(h, 16777619); } return 'p' + (h >>> 0).toString(36); }
+function rememberPerson(l, newLoan) {
+  if (!personKey(l.names)) return;
+  const id = personId(l.names), old = S.people.get(id) || {};
+  const p = { name: l.names.trim(), email: emailIn(l.contact) || old.email || '', contact: l.contact || old.contact || '',
+    group: l.group || old.group || '', course: l.course || old.course || '', lastLoan: l.ref || old.lastLoan || '',
+    lastAt: newLoan ? new Date().toISOString() : (old.lastAt || l.createdAt || ''), loans: (old.loans || 0) + (newLoan ? 1 : 0) };
+  if (!newLoan && old.email === p.email && old.contact === p.contact) return;
+  writeDoc('people', id, p);
+}
+// Saved people first; older loans fill in anyone not saved yet.
+function peopleList() {
+  const m = new Map();
+  for (const l of [...S.loans.values()].sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || ''))) {
+    const k = personKey(l.names); if (!k) continue;
+    const o = m.get(k) || { loans: 0 };
+    m.set(k, { name: l.names.trim(), email: emailIn(l.contact) || o.email || '', contact: l.contact || o.contact || '',
+      group: l.group || o.group || '', course: l.course || o.course || '', lastAt: l.createdAt || o.lastAt || '', loans: o.loans + 1 });
+  }
+  for (const p of S.people.values()) { const k = personKey(p.name); if (k) m.set(k, { ...m.get(k), ...p, loans: Math.max(p.loans || 0, (m.get(k) || {}).loans || 0) }); }
+  return [...m.values()];
+}
+
 function goLocal(msg) {
   S.mode = 'local'; loadLocal(); S.ready = true;
   banner(msg || 'Data is saved in this browser only. Connect a private GitHub repository to keep it safe and use it on other computers.', 'warn',
@@ -995,6 +1155,8 @@ async function startStorage() {
     S.loans = new Map(snap.docs.map(d => [d.id, { ...d.data(), id: d.id }]));
     if (!snap.metadata.fromCache) gotLoans = true; settle();
   }, fail('loans'));
+  db.collection('history').onSnapshot(snap => { S.hist = new Map(snap.docs.map(d => [d.id, { ...d.data(), id: d.id }])); renderAll(); }, () => {});
+  db.collection('people').onSnapshot(snap => { S.people = new Map(snap.docs.map(d => [d.id, { ...d.data(), id: d.id }])); renderAll(); }, () => {});
 }
 
 /* ---------- derived ---------- */
@@ -1018,16 +1180,17 @@ const sortedInv = () => [...S.inv.values()].sort((a, b) => (a.name || '').locale
 
 /* ---------- views / tabs ---------- */
 function setView(v, push = true) {
-  if (!['inventory', 'new', 'loans'].includes(v)) v = 'inventory';
+  const views = ['inventory', 'new', 'loans', 'history'];
+  if (!views.includes(v)) v = 'inventory';
   S.view = v;
   for (const b of document.querySelectorAll('.tabs button')) b.setAttribute('aria-selected', String(b.dataset.view === v));
-  for (const s of ['inventory', 'new', 'loans']) $('#view-' + s).hidden = s !== v;
+  for (const s of views) $('#view-' + s).hidden = s !== v;
   if (push) try { history.replaceState(null, '', '#' + v); } catch (e) {}
 }
 document.querySelector('.tabs').addEventListener('click', e => { const b = e.target.closest('button[data-view]'); if (b) setView(b.dataset.view); });
 
 /* ---------- render ---------- */
-function renderAll() { renderStats(); renderFilters(); renderCats(); renderInventory(); renderPicker(); renderDraft(); renderSaved(); renderLoans(); renderDetail(); renderBadge(); }
+function renderAll() { renderStats(); renderFilters(); renderCats(); renderInventory(); renderPicker(); renderDraft(); renderSaved(); renderLoans(); renderDetail(); renderBadge(); renderHistory(); }
 
 function renderStats() {
   const onLoan = onLoanMap();
@@ -1107,7 +1270,7 @@ function renderInventory() {
         <td>${i.serial ? `<span class="serial">${esc(i.serial)}</span>` : '<span class="muted">–</span>'}</td>
         <td class="ctr"><div class="stepper">
           <button class="icon" data-act="dec" data-id="${i.id}" aria-label="One less ${esc(i.name)}" ${(i.total || 0) <= ol ? 'disabled' : ''}>−</button>
-          <input type="number" min="${ol}" step="1" value="${i.total || 0}" data-act="total" data-id="${i.id}" aria-label="Amount of ${esc(i.name)} in stock">
+          <input type="number" min="${ol}" step="1" value="${i.total || 0}" inputmode="numeric" data-act="total" data-id="${i.id}" aria-label="Amount of ${esc(i.name)} in stock">
           <button class="icon" data-act="inc" data-id="${i.id}" aria-label="One more ${esc(i.name)}">+</button></div></td>
         <td class="num mono">${ol}</td>
         <td class="num"><span class="avail ${av <= 0 ? 'zero' : av <= 1 ? 'low' : ''}">${av}</span></td>
@@ -1205,8 +1368,9 @@ function setTotal(id, total) {
   total = Math.max(0, int(total));
   if (total < ol) { toast(`${ol} unit(s) of ${it.name} are on loan, so stock can't go below ${ol}.`, 'bad'); total = ol; }
   if (total === it.total) { renderInventory(); return; }
+  const before = { ...it };
   it.total = total; renderAll();
-  writeDoc('inventory', id, { ...it, total, updatedAt: new Date().toISOString() });
+  writeDoc('inventory', id, { ...it, total, updatedAt: new Date().toISOString() }, before);
 }
 $('#invTable').addEventListener('click', e => {
   const b = e.target.closest('button[data-act]'); if (!b) return;
@@ -1351,12 +1515,12 @@ function startEdit(id) {
   S.editingId = id;
   $('#invFormTitle').textContent = 'Edit device';
   $('#invName').value = it.name || ''; $('#invCat').value = it.category || ''; $('#invSerial').value = it.serial || '';
-  $('#invTotal').value = it.total || 0; $('#invNotes').value = it.notes || '';
+  $('#invTotal').value = it.total || 0; $('#invNotes').value = it.notes || ''; syncStepButtons($('#invTotal'));
   $('#invSubmit').textContent = 'Save changes'; $('#invCancel').hidden = false;
   $('#invForm').scrollIntoView({ behavior: 'smooth', block: 'start' }); $('#invName').focus({ preventScroll: true });
 }
 function resetInvForm() {
-  S.editingId = null; $('#invForm').reset(); $('#invTotal').value = 1;
+  S.editingId = null; $('#invForm').reset(); $('#invTotal').value = 1; syncStepButtons($('#invTotal'));
   $('#invFormTitle').textContent = 'Add device'; $('#invSubmit').textContent = 'Add to inventory'; $('#invCancel').hidden = true;
 }
 $('#invCancel').addEventListener('click', resetInvForm);
@@ -1396,7 +1560,7 @@ function renderPicker() {
   }).join('');
   if (cur && S.inv.has(cur)) sel.value = cur;
 }
-$('#pkItem').addEventListener('change', e => { const it = S.inv.get(e.target.value); $('#pkSerial').value = it?.serial || ''; $('#pkQty').value = 1; });
+$('#pkItem').addEventListener('change', e => { const it = S.inv.get(e.target.value); $('#pkSerial').value = it?.serial || ''; $('#pkQty').value = 1; syncStepButtons($('#pkQty')); });
 $('#pkAdd').addEventListener('click', () => {
   const id = $('#pkItem').value, it = S.inv.get(id);
   if (!it) { toast('Choose a device first.', 'bad'); return; }
@@ -1407,7 +1571,7 @@ $('#pkAdd').addEventListener('click', () => {
   const serial = $('#pkSerial').value.trim();
   const same = S.draft.find(d => d.itemId === id && d.serial === serial);
   if (same) same.qty += qty; else S.draft.push({ key: uid(), itemId: id, name: it.name, serial, qty });
-  $('#pkItem').value = ''; $('#pkSerial').value = ''; $('#pkQty').value = 1;
+  $('#pkItem').value = ''; $('#pkSerial').value = ''; $('#pkQty').value = 1; syncStepButtons($('#pkQty'));
   renderPicker(); renderDraft();
 });
 function renderDraft() {
@@ -1424,6 +1588,7 @@ function resetLoanForm() {
   $('#loanForm').reset(); S.draft = [];
   $('#lnStart').value = todayISO(); $('#lnEnd').value = addDays(todayISO(), 14);
   renderPicker(); renderDraft();
+  for (const i of document.querySelectorAll('.num-step input[type=number]')) syncStepButtons(i);
 }
 $('#lnClear').addEventListener('click', () => { resetLoanForm(); S.lastSaved = null; renderSaved(); });
 function makeRef(start) {
@@ -1449,6 +1614,7 @@ $('#loanForm').addEventListener('submit', async e => {
   const ok = await writeDoc('loans', id, loan);
   $('#lnSave').disabled = false;
   if (!ok) return;
+  rememberPerson(loan, true);
   S.lastSaved = { ...loan, id };
   resetLoanForm(); renderSaved();
   window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -1562,7 +1728,7 @@ function renderDetail() {
         const back = rd.qty[i], done = back >= it.qty;
         return `<tr class="ret-row ${done ? 'done' : 'miss'}"><td><div class="dev-name">${esc(it.name)}</div>${it.serial ? `<span class="serial">${esc(it.serial)}</span>` : ''}</td>
           <td class="ctr mono">${it.qty}</td>
-          <td class="ctr"><input class="ret-input" type="number" min="0" max="${it.qty}" step="1" value="${back}" data-ri="${i}" aria-label="${esc(it.name)} returned"></td>
+          <td class="ctr"><div class="stepper"><button type="button" class="icon" data-step="-1" aria-label="One less ${esc(it.name)} back" ${back <= 0 ? 'disabled' : ''}>−</button><input class="ret-input" type="number" min="0" max="${it.qty}" step="1" value="${back}" inputmode="numeric" data-ri="${i}" aria-label="${esc(it.name)} returned"><button type="button" class="icon" data-step="1" aria-label="One more ${esc(it.name)} back" ${back >= it.qty ? 'disabled' : ''}>+</button></div></td>
           <td class="num">${done ? '<span class="chip ok">Back</span>' : `<button class="btn small" data-all="${i}">All back</button>`}</td></tr>`;
       }).join('')}</tbody></table></div>
     <div class="field" style="margin-top:10px"><label for="retNotes">Return notes</label><textarea id="retNotes" rows="2" placeholder="Damage, missing cables, who returned it…">${esc(rd.notes)}</textarea></div>
@@ -1752,7 +1918,9 @@ async function saveLoanEmail(l, raw) {
   const addr = emailIn(raw);
   if (!addr) { toast('That does not look like an email address.', 'bad'); return false; }
   const contact = l.contact && !emailIn(l.contact) ? `${addr}, ${l.contact}` : addr;
-  return writeDoc('loans', l.id, { ...l, contact });
+  const ok = await writeDoc('loans', l.id, { ...l, contact });
+  if (ok) rememberPerson({ ...l, contact }, false);
+  return ok;
 }
 
 async function buildXlsx(l) {
@@ -1803,6 +1971,147 @@ async function exportInventory(items, filename) {
   const buf = await wb.xlsx.writeBuffer();
   await offerFile(filename, new Blob([buf]));
 }
+
+/* ---------- history page ---------- */
+const fmtWhen = iso => { if (!iso) return ''; const d = new Date(iso); if (isNaN(d)) return iso; return `${d.getDate()}.${d.getMonth() + 1}.${d.getFullYear()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; };
+function renderHistory() {
+  const box = $('#histTable'); if (!box) return;
+  const q = S.histQuery.trim().toLowerCase();
+  const all = [...S.hist.values()].sort((a, b) => (b.at || '').localeCompare(a.at || ''));
+  const rows = all.filter(h => (!S.histType || h.type === S.histType) &&
+    (!q || [h.action, h.text, h.by, fmtWhen(h.at)].some(v => String(v || '').toLowerCase().includes(q))));
+  const where = S.mode === 'github' ? 'Saved in history.json in the data repository.' : S.mode === 'local' ? 'Saved in this browser.' : '';
+  if (!all.length) { box.innerHTML = `<div class="empty"><strong>No changes recorded yet</strong><span>Every change to devices and loans from now on is listed here. ${where}</span></div>`; return; }
+  if (!rows.length) { box.innerHTML = `<div class="empty"><strong>No matching changes</strong><span>Try another search or type.</span></div>`; return; }
+  const shown = rows.slice(0, S.histLimit);
+  box.innerHTML = `<div class="table-wrap"><table>
+    <thead><tr><th>When</th><th>Who</th><th>Change</th><th>Details</th></tr></thead>
+    <tbody>${shown.map(h => `<tr><td class="hist-when">${esc(fmtWhen(h.at))}</td><td class="hist-who">${h.by ? esc(h.by) : '<span class="muted">–</span>'}</td>
+      <td class="hist-act">${esc(h.action || '')}</td><td>${esc(h.text || '')}</td></tr>`).join('')}</tbody></table></div>
+    <div class="hist-more"><span class="sheet-note">Showing ${shown.length} of ${rows.length} change${rows.length === 1 ? '' : 's'}. ${where}</span>
+    ${rows.length > shown.length ? '<button class="btn small" type="button" id="histMore">Show more</button>' : ''}</div>`;
+}
+$('#histSearch').addEventListener('input', e => { S.histQuery = e.target.value; S.histLimit = 100; renderHistory(); });
+$('#histType').addEventListener('change', e => { S.histType = e.target.value; S.histLimit = 100; renderHistory(); });
+$('#histTable').addEventListener('click', e => { if (e.target.id === 'histMore') { S.histLimit += 200; renderHistory(); } });
+
+/* ---------- name and email suggestions in New loan ---------- */
+function markMatch(text, q) {
+  const t = String(text || ''), i = q ? t.toLowerCase().indexOf(q.toLowerCase()) : -1;
+  if (i < 0) return esc(t);
+  return esc(t.slice(0, i)) + '<mark>' + esc(t.slice(i, i + q.length)) + '</mark>' + esc(t.slice(i + q.length));
+}
+function findPeople(q, fields) {
+  const ql = q.trim().toLowerCase(); if (!ql) return [];
+  return peopleList().map(p => {
+    let score = -1;
+    for (const f of fields) {
+      const s = String(p[f] || '').toLowerCase(); if (!s) continue;
+      if (s.startsWith(ql)) score = Math.max(score, 2);
+      else if (s.split(/[\s,.@_-]+/).some(w => w.startsWith(ql))) score = Math.max(score, 1);
+      else if (s.includes(ql)) score = Math.max(score, 0);
+    }
+    return { p, score };
+  }).filter(x => x.score >= 0)
+    .sort((a, b) => b.score - a.score || (b.p.lastAt || '').localeCompare(a.p.lastAt || ''))
+    .slice(0, 8).map(x => x.p);
+}
+function attachSuggest(input, o) {
+  const box = document.createElement('div');
+  box.className = 'suggest'; box.id = input.id + 'Suggest'; box.setAttribute('role', 'listbox'); box.hidden = true;
+  input.parentElement.classList.add('has-suggest'); input.parentElement.appendChild(box);
+  input.setAttribute('role', 'combobox'); input.setAttribute('aria-autocomplete', 'list');
+  input.setAttribute('aria-expanded', 'false'); input.setAttribute('aria-controls', box.id);
+  let items = [], idx = -1, q = '';
+  const close = () => { box.hidden = true; idx = -1; input.setAttribute('aria-expanded', 'false'); input.removeAttribute('aria-activedescendant'); };
+  const draw = () => {
+    box.innerHTML = `<div class="sg-head">Borrowed before</div>` + items.map((p, i) => {
+      const [main, sub] = o.label(p);
+      return `<div class="sg-item${i === idx ? ' on' : ''}" role="option" id="${box.id}-${i}" aria-selected="${i === idx}" data-i="${i}">
+        <span class="sg-main">${markMatch(main, q)}</span>${sub ? `<span class="sg-sub">${markMatch(sub, q)}</span>` : ''}</div>`;
+    }).join('');
+    if (idx >= 0) { input.setAttribute('aria-activedescendant', `${box.id}-${idx}`); const el = $('#' + box.id + '-' + idx); if (el) el.scrollIntoView({ block: 'nearest' }); }
+    else input.removeAttribute('aria-activedescendant');
+  };
+  const update = () => {
+    q = input.value.trim(); items = q ? findPeople(q, o.fields) : [];
+    // nothing to suggest when the box already holds exactly the one match
+    if (items.length === 1 && String(o.label(items[0])[0]).toLowerCase() === q.toLowerCase() && o.isFilled(items[0])) items = [];
+    idx = -1;
+    if (!items.length) { close(); return; }
+    draw(); box.hidden = false; input.setAttribute('aria-expanded', 'true');
+  };
+  const pick = i => { const p = items[i]; close(); if (p) o.pick(p); };
+  input.addEventListener('input', update);
+  input.addEventListener('keydown', e => {
+    if (box.hidden) { if (e.key === 'ArrowDown' && input.value.trim()) { update(); } return; }
+    if (e.key === 'ArrowDown') { e.preventDefault(); idx = (idx + 1) % items.length; draw(); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); idx = idx <= 0 ? items.length - 1 : idx - 1; draw(); }
+    else if (e.key === 'Enter' && idx >= 0) { e.preventDefault(); pick(idx); }
+    else if (e.key === 'Tab' && idx >= 0) { pick(idx); }
+    else if (e.key === 'Escape') { e.preventDefault(); close(); }
+  });
+  input.addEventListener('blur', () => setTimeout(close, 150));
+  box.addEventListener('mousedown', e => { const it = e.target.closest('[data-i]'); if (!it) return; e.preventDefault(); pick(+it.dataset.i); });
+}
+const contactOf = p => p.contact || p.email || '';
+function fillBorrower(p, from) {
+  const set = (sel, v, force) => { const el = $(sel); if (v && (force || !el.value.trim())) el.value = v; };
+  set('#lnNames', p.name, from === 'names');
+  set('#lnContact', contactOf(p), from === 'contact' || from === 'names');
+  set('#lnGroup', p.group); set('#lnCourse', p.course);
+}
+attachSuggest($('#lnNames'), {
+  fields: ['name'],
+  label: p => [p.name, [contactOf(p), p.group].filter(Boolean).join(' · ')],
+  isFilled: p => $('#lnContact').value.trim() === contactOf(p),
+  pick: p => { fillBorrower(p, 'names'); toast(`Filled in ${p.name}${contactOf(p) ? ' and their contact' : ''}.`); }
+});
+attachSuggest($('#lnContact'), {
+  fields: ['email', 'contact', 'name'],
+  label: p => [contactOf(p) || p.name, contactOf(p) ? p.name : ''],
+  isFilled: p => $('#lnNames').value.trim().toLowerCase() === (p.name || '').toLowerCase(),
+  pick: p => fillBorrower(p, 'contact')
+});
+
+/* ---------- number boxes: − / + buttons, whole numbers only, never below the minimum ---------- */
+function numLimits(i) { return { min: i.min === '' ? 0 : +i.min, max: i.max === '' ? Infinity : +i.max }; }
+function syncStepButtons(i) {
+  const wrap = i.parentElement; if (!wrap || !wrap.querySelector('[data-step]')) return;
+  const { min, max } = numLimits(i), v = int(i.value);
+  for (const b of wrap.querySelectorAll('[data-step]')) b.disabled = i.disabled || (+b.dataset.step < 0 ? v <= min : v >= max);
+}
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-step]'); if (!b) return;
+  const i = b.parentElement.querySelector('input[type=number]'); if (!i || i.disabled) return;
+  const { min, max } = numLimits(i);
+  const v = Math.min(max, Math.max(min, (i.value === '' ? min : int(i.value)) + +b.dataset.step));
+  i.value = v; syncStepButtons(i);
+  i.dispatchEvent(new Event('input', { bubbles: true }));
+  i.dispatchEvent(new Event('change', { bubbles: true }));
+});
+document.addEventListener('keydown', e => {
+  const i = e.target;
+  if (i && i.matches && i.matches('input[type=number]') && e.key.length === 1 && !/[0-9]/.test(e.key) && !e.ctrlKey && !e.metaKey) e.preventDefault();
+}, true);
+document.addEventListener('input', e => {
+  const i = e.target; if (!(i && i.matches && i.matches('input[type=number]'))) return;
+  if (i.value !== '' && (+i.value < 0 || !Number.isInteger(+i.value))) i.value = Math.max(numLimits(i).min, Math.abs(Math.trunc(+i.value)) || 0);
+  syncStepButtons(i);
+}, true);
+// Clamp before the app's own change handlers run (capture phase).
+document.addEventListener('change', e => {
+  const i = e.target; if (!(i && i.matches && i.matches('input[type=number]'))) return;
+  const { min, max } = numLimits(i);
+  i.value = Math.min(max, Math.max(min, i.value === '' ? min : int(i.value)));
+  syncStepButtons(i);
+}, true);
+document.addEventListener('paste', e => {
+  const i = e.target; if (!(i && i.matches && i.matches('input[type=number]'))) return;
+  const t = (e.clipboardData || window.clipboardData).getData('text');
+  if (!/^\s*\d+\s*$/.test(t)) e.preventDefault();
+}, true);
+for (const i of document.querySelectorAll('.num-step input[type=number]')) syncStepButtons(i);
 
 /* ---------- boot ---------- */
 resetLoanForm();

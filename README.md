@@ -10,6 +10,7 @@ It keeps track of the lab's devices, records who has borrowed what, produces the
 ### Inventory
 - Add devices with name, category, serial / asset number, amount in stock and notes.
 - Change stock amounts straight in the table (− / + or type a number). Stock can't go below what is on loan.
+- All number boxes use − / + buttons and only accept whole numbers; negative numbers can't be entered.
 - Edit or delete devices. A device can't be deleted while some of it is on loan.
 - See for every device how many are **in stock**, **on loan** and **available**.
 - **Search** by name, category, serial number or notes.
@@ -24,6 +25,7 @@ It keeps track of the lab's devices, records who has borrowed what, produces the
 
 ### New loan
 - Fields follow the paper form: Name(s), Group, Course, Start date, End date, plus Contact and Notes (not printed).
+- **Suggestions for returning borrowers**: start typing a name or an email and people who borrowed before are listed (use the mouse, or ↓ / ↑ and Enter). Picking one fills in the name, contact, and group and course if those are empty.
 - Pick devices from the inventory with number and serial number. You can't lend more than is available.
 - After saving: **Download PDF**, **Download Excel**, **Print** or **Email to borrower**.
 
@@ -43,6 +45,10 @@ It keeps track of the lab's devices, records who has borrowed what, produces the
 - **Return check**: enter how many of each item came back, or use **All back** / **Mark everything back**. Partial returns keep the loan open and show what is still missing. When everything is back the loan closes and the equipment counts as available again.
 - Return notes for damage, missing cables and so on.
 
+### History
+- The **History** page lists every change: devices added, edited, deleted or restocked, loans created, return checks, returns, contact changes and deleted loans, with date, time and who did it.
+- Search the history, or show only inventory or only loan changes.
+
 ### General
 - Sidebar with lab totals: units in stock, out on loan, available now and overdue loans.
 - Karelia green theme with **Light**, **Dark** and **Auto** modes (button at the bottom of the sidebar).
@@ -54,7 +60,16 @@ This repository only holds the app (and `users.json`, see Users below). **No stu
 visitors without a login can't see or change any data.
 
 The app saves its data to a `data.json` file in a separate **private** repository (`SakibKhan-Karelia/ict-lab-loan-data`).
-Every change is a commit there, so the data repository also keeps a full history of who borrowed what and when.
+It keeps three files, all saved together in one commit for every change:
+
+| File | What it holds |
+| --- | --- |
+|  | Inventory and loans. |
+|  | Every change, newest first, one line per change (date, who, what). This is what the History page shows. |
+|  | Everyone who has borrowed, with their email, group and course. Used for the suggestions in New loan. |
+
+ and  are created automatically with the first change. Borrowers from loans saved before  existed are suggested too.
+The commit list of the data repository is also a full record of who changed what and when.
 
 ### Connecting a browser (owner)
 
@@ -127,6 +142,7 @@ The app uses [jsPDF](https://github.com/parallax/jsPDF) for PDF files and [Excel
 
 New features are listed here, newest first.
 
+- **2026-11-05**: History page and ;  with name and email suggestions in New loan; − / + buttons on all number boxes and no negative numbers; all data files saved in one commit.
 - **2026-11-05**: User logins with username and password (Users panel, Sign in screen, Sign out); every change records who made it; loans show Lent by and Checked by. Default sort is Name A–Z.
 - **2026-11-04**: Checkboxes only appear after pressing Select; Select all / Deselect / Deselect all buttons.
 - **2026-11-04**: Selection bar with Select all, Export to Excel, Delete and Clear; Export moved from the page header into the bar; faster start-up.
