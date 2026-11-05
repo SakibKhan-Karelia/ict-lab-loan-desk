@@ -375,7 +375,7 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
               <option value="serial">Serial / asset no.</option>
               <option value="notes">Notes</option>
             </select></div>
-          <div class="actions adv-actions"><button class="btn" type="button" id="fClear">Clear filters</button><span class="sheet-note" id="fCount"></span></div>
+          <div class="actions adv-actions"><button class="btn" type="button" id="fClear">Clear filters</button><button class="btn" type="button" id="advClose" title="Hide advanced search (filters stay on)">Close</button><span class="sheet-note" id="fCount"></span></div>
         </div>
         <form class="box" id="invForm" autocomplete="off">
           <div class="add-bar-title"><h2 id="invFormTitle">Add device</h2></div>
@@ -1482,6 +1482,7 @@ $('#advToggle').addEventListener('click', () => {
   $('#advToggle').setAttribute('aria-expanded', String(!p.hidden));
   if (!p.hidden) $('#fCat').focus();
 });
+$('#advClose').addEventListener('click', () => { $('#advPanel').hidden = true; $('#advToggle').setAttribute('aria-expanded', 'false'); $('#advToggle').focus(); });
 for (const [id, key] of [['#fCat', 'cat'], ['#fAvail', 'avail'], ['#fField', 'field']]) {
   $(id).addEventListener('change', e => { S.f[key] = e.target.value; renderFilters(); renderInventory(); });
 }
