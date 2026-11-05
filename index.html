@@ -410,7 +410,7 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
         <div id="savedBox"></div>
         <form id="loanForm" autocomplete="off" class="loan-grid">
           <div class="box">
-            <div class="box-head"><h2>Borrower</h2><div class="actions"><span class="sheet-note" id="dirInfo"></span><button type="button" class="link-btn" id="dirImport" title="Import a student / staff list (CSV from Moodle) for name and email suggestions">Import student list</button><input type="file" id="dirFile" accept=".csv,text/csv" hidden></div></div>
+            <div class="box-head"><h2>Borrower</h2><div class="actions"><span class="sheet-note" id="dirInfo"></span><button type="button" class="link-btn" id="dirImport" title="Import a student / staff list (Excel or CSV, e.g. from Moodle) for name and email suggestions">Import student list</button><input type="file" id="dirFile" accept=".xlsx,.csv,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden></div></div>
             <div class="box-pad form">
               <div class="field"><label for="lnNames">Name(s)</label><input type="text" id="lnNames" required placeholder="Borrower name(s), separated by commas"></div>
               <div class="row2">
@@ -2148,8 +2148,11 @@ function parseCsv(text) {
   return rows.filter(r => r.some(c => c.trim()));
 }
 // Reads a Moodle participants / completion export: "Full name" (or First name + Last name), "Username", "Email address".
-function directoryFromCsv(text) {
-  const rows = parseCsv(text.replace(/^﻿/, '')); if (rows.length < 2) return [];
+const directoryFromCsv = text => directoryFromRows(parseCsv(text.replace(/^\uFEFF/, '')));
+// Rows from a CSV or an Excel sheet. Returns null when the needed columns are missing.
+function directoryFromRows(rows) {
+  rows = rows.filter(r => r.some(c => String(c).trim()));
+  if (rows.length < 2) return [];
   const head = rows[0].map(h => h.trim().toLowerCase());
   const col = (...names) => head.findIndex(h => names.some(n => h === n || h.startsWith(n)));
   const iName = col('full name', 'name'), iFirst = col('first name'), iLast = col('last name', 'surname');
@@ -2182,8 +2185,26 @@ function bulkWrite(col, entries, message) {
   for (const [id, body] of entries) map.set(id, { ...body, id });
   saveLocal(); renderAll(); return true;
 }
+const cellText = v => v == null ? '' : typeof v !== 'object' ? String(v) : v instanceof Date ? v.toISOString().slice(0, 10)
+  : v.text != null ? (typeof v.text === 'object' ? cellText(v.text) : String(v.text)) : v.richText ? v.richText.map(t => t.text).join('') : v.result != null ? String(v.result) : '';
+// Excel: use the first sheet that has name and email columns.
+async function directoryFromXlsx(file) {
+  if (!window.ExcelJS) { toast('The Excel tool did not load. Reload the page and try again.', 'bad'); return undefined; }
+  const wb = new ExcelJS.Workbook();
+  try { await wb.xlsx.load(await file.arrayBuffer()); } catch (e) { toast('Could not read that Excel file.', 'bad'); return undefined; }
+  for (const ws of wb.worksheets) {
+    const rows = [];
+    ws.eachRow({ includeEmpty: false }, row => { const r = []; row.eachCell({ includeEmpty: true }, (c, i) => { r[i - 1] = cellText(c.value); }); rows.push(Array.from(r, x => x || '')); });
+    const list = directoryFromRows(rows);
+    if (list && list.length) return list;
+  }
+  return null;
+}
 async function importDirectory(file) {
-  const list = directoryFromCsv(await file.text());
+  const isXlsx = /\.xlsx$/i.test(file.name);
+  if (/\.xls$/i.test(file.name)) { toast('Old .xls files are not supported. Save it as .xlsx or .csv and try again.', 'bad'); return; }
+  const list = isXlsx ? await directoryFromXlsx(file) : directoryFromCsv(await file.text());
+  if (list === undefined) return;
   if (list === null) { toast('That file has no "Full name" and "Email address" columns.', 'bad'); return; }
   if (!list.length) { toast('No names with email addresses found in that file.', 'bad'); return; }
   const now = new Date().toISOString();
