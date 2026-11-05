@@ -25,8 +25,9 @@ It keeps track of the lab's devices, records who has borrowed what, produces the
 
 ### New loan
 - Fields follow the paper form: Name(s), Group, Course, Start date, End date, plus Contact and Notes (not printed).
-- **Name and email suggestions**: start typing a name, an email or a student number. Matching people are listed: those who borrowed before first (marked "borrowed 2×" and so on), then everyone on the imported student and staff list. Use the mouse, or ↓ / ↑ and Enter. Picking one fills in the name and email, and the group and course if they are empty.
+- **Name and email suggestions**: start typing a name, an email or a student number. Matching people are listed: those who borrowed before first (marked "borrowed 2×" and so on), then everyone else on the borrower list. Use the mouse, or ↓ / ↑ and Enter. Picking one fills in the name and email, and the group and course if they are empty.
 - **Import student list** (top of the Borrower box): choose an Excel file (.xlsx) or a CSV with "Full name" (or "First name" and "Last name"), "Email address" and optionally "Username" columns, for example a Moodle completion progress or participants export. In an Excel file the first sheet with those columns is used. Everyone in it is added to the suggestions. Import again whenever there are new students; people already on the list are updated, nobody is removed. System accounts are skipped, and if someone appears twice (a private and a school email) the school email is kept.
+- **New borrowers are added automatically**: when a loan is saved for a name or email that is not on the borrower list yet, that person is added (marked as "added"). For people already on the list, the latest group, course and contact are kept.
 - **Course suggestions**: type a course name or code (for example "iot" or "IC10028") to pick a course from the ICT curriculum. Courses typed in earlier loans are suggested too.
 - The end date can't be before the start date. Moving the start date past the end date moves the end date to two weeks after the start.
 - Pick devices from the inventory with number and serial number. You can't lend more than is available.
@@ -62,18 +63,19 @@ It keeps track of the lab's devices, records who has borrowed what, produces the
 This repository only holds the app (and `users.json`, see Users below). **No student, loan or inventory data is stored here.** It is safe for this repository to be public:
 visitors without a login can't see or change any data.
 
-The app saves its data to a `data.json` file in a separate **private** repository (`SakibKhan-Karelia/ict-lab-loan-data`).
-It keeps three files, all saved together in one commit for every change:
+The app saves its data in a separate **private** repository (`SakibKhan-Karelia/ict-lab-loan-data`), one file per kind of data.
+Each change is one commit that only touches the files it changed:
 
 | File | What it holds |
 | --- | --- |
-| `data.json` | Inventory and loans. |
+| `inventory.json` | Devices and components, one per line, A–Z. |
+| `loans.json` | Loan records, newest first, one per line. |
+| `borrowers.json` | Students and staff: everyone imported with **Import student list** (`"source":"imported"`) and everyone typed into a loan who wasn't on the list (`"source":"added"`). Name, email, username, group, course. Used for the suggestions in New loan. |
 | `history.json` | Every change, newest first, one line per change (date, who, what). This is what the History page shows. |
-| `people.json` | Everyone who has borrowed, with their email, group and course. Used for the suggestions in New loan. |
-| `directory.json` | The student and staff list imported with **Import student list** (name, username, email). Used for the suggestions in New loan. |
 
-`history.json`, `people.json` and `directory.json` are created automatically when first needed.
-The student list holds personal data, so it is only ever saved in the private data repository, never in this public one. Borrowers from loans saved before `people.json` existed are suggested too.
+The files are created automatically when first needed.
+Older versions of the app kept inventory and loans together in `data.json` (and borrowers in `people.json` / `directory.json`). The first time the new version opens such a repository it moves everything into the new files and removes the old ones, in one commit.
+The borrower list holds personal data, so it is only ever saved in the private data repository, never in this public one.
 The commit list of the data repository is also a full record of who changed what and when.
 
 ### Connecting a browser (owner)
@@ -147,6 +149,7 @@ The app uses [jsPDF](https://github.com/parallax/jsPDF) for PDF files and [Excel
 
 New features are listed here, newest first.
 
+- **2026-11-05**: Data split into `inventory.json`, `loans.json`, `borrowers.json` and `history.json` (moved automatically from `data.json`, `people.json` and `directory.json`); one borrower list for imported and typed-in people; new names and emails typed into a loan are added to the borrower list.
 - **2026-11-05**: Import student list also accepts Excel (.xlsx) files.
 - **2026-11-05**: Import student list (Moodle CSV) into `directory.json` for name and email suggestions; search by student number; course suggestions from the ICT curriculum; end date can't be before the start date; wider In stock box.
 - **2026-11-05**: History page and `history.json`; `people.json` with name and email suggestions in New loan; − / + buttons on all number boxes and no negative numbers; all data files saved in one commit.

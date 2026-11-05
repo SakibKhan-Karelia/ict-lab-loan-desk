@@ -530,7 +530,7 @@ applyTheme();
 
 /* ---------- storage ---------- */
 const S = {
-  inv: new Map(), loans: new Map(), hist: new Map(), people: new Map(), dir: new Map(), mode: 'starting', db: null, ready: false,
+  inv: new Map(), loans: new Map(), hist: new Map(), borrowers: new Map(), mode: 'starting', db: null, ready: false,
   histQuery: '', histType: '', histLimit: 100,
   view: 'inventory', invQuery: '', editingId: null, pendingDel: null,
   draft: [], lastSaved: null,
@@ -543,14 +543,13 @@ function loadLocal() {
     S.inv = new Map(Object.entries(j.inventory || {}).map(([k, v]) => [k, { ...v, id: k }]));
     S.loans = new Map(Object.entries(j.loans || {}).map(([k, v]) => [k, { ...v, id: k }]));
     S.hist = new Map(Object.entries(j.history || {}).map(([k, v]) => [k, { ...v, id: k }]));
-    S.people = new Map(Object.entries(j.people || {}).map(([k, v]) => [k, { ...v, id: k }]));
-    S.dir = new Map(Object.entries(j.directory || {}).map(([k, v]) => [k, { ...v, id: k }]));
+    S.borrowers = new Map(Object.entries(j.borrowers || mergeBorrowers(j.directory, j.people)).map(([k, v]) => [k, { ...v, id: k }]));
   } catch (e) {}
 }
 function saveLocal() {
   try {
     const strip = m => Object.fromEntries([...m].map(([k, v]) => { const o = { ...v }; delete o.id; return [k, o]; }));
-    localStorage.setItem(LS_KEY, JSON.stringify({ inventory: strip(S.inv), loans: strip(S.loans), history: strip(S.hist), people: strip(S.people), directory: strip(S.dir) }));
+    localStorage.setItem(LS_KEY, JSON.stringify({ inventory: strip(S.inv), loans: strip(S.loans), history: strip(S.hist), borrowers: strip(S.borrowers) }));
   } catch (e) {}
 }
 function writeErr(e) {
@@ -561,11 +560,13 @@ function writeErr(e) {
 }
 /* ---------- GitHub storage (used outside the Claude viewer, e.g. on GitHub Pages) ---------- */
 const GH_KEY = 'ict-lab-loan-desk-github';
-const GH = { cfg: null, head: null, remote: emptyData(), ops: new Map(), msgs: [], timer: null, saving: false, again: false, state: 'idle', lastPull: 0 };
-// The data repository holds three files: data.json (inventory and loans), history.json (every change) and people.json (borrowers for suggestions).
-const FILE_COLS = { data: ['inventory', 'loans'], history: ['history'], people: ['people'], directory: ['directory'] };
+const GH = { cfg: null, head: null, migrate: null, remote: emptyData(), ops: new Map(), msgs: [], timer: null, saving: false, again: false, state: 'idle', lastPull: 0 };
+// The data repository holds one file per kind of data. Each change is one commit that touches only the files it changed.
+const FILE_COLS = { inventory: ['inventory'], loans: ['loans'], borrowers: ['borrowers'], history: ['history'] };
+// Older versions kept inventory and loans together in data.json, and people in people.json / directory.json.
+const LEGACY_FILES = ['data', 'people', 'directory'];
 const HIST_MAX = 20000;
-function emptyData() { return { inventory: {}, loans: {}, history: {}, people: {}, directory: {} }; }
+function emptyData() { return { inventory: {}, loans: {}, history: {}, borrowers: {} }; }
 function ghLoadCfg() {
   for (const store of [() => localStorage, () => sessionStorage]) {
     try { const v = store().getItem(GH_KEY); if (v) return JSON.parse(v); } catch (e) {}
@@ -589,6 +590,7 @@ const ghContentsUrl = path => ghRepoUrl() + '/contents/' + path.split('/').map(e
 const ghFileUrl = () => ghContentsUrl(GH.cfg.path);
 const ghBranchPath = () => GH.cfg.branch.split('/').map(encodeURIComponent).join('/');
 const ghRefUrl = () => ghRepoUrl() + '/git/refs/heads/' + ghBranchPath();
+// Files sit next to the configured data file (data.json at the top of the repository by default).
 function ghPathOf(f) {
   const p = GH.cfg.path; if (f === 'data') return p;
   const i = p.lastIndexOf('/'); return (i >= 0 ? p.slice(0, i + 1) : '') + f + '.json';
@@ -612,25 +614,28 @@ function ghCheck(r) {
   if (!r.ok) throw new GhError('http', 'HTTP ' + r.status);
   return r;
 }
-// history.json and people.json are lists (one entry per line) so they are easy to read on GitHub.
+// Files are lists with one entry per line, so they are easy to read on GitHub.
 const listToObj = list => { const o = {}; for (const e of list || []) if (e && e.id) { const v = { ...e }; delete v.id; o[e.id] = v; } return o; };
 const objToList = o => Object.entries(o || {}).map(([id, v]) => ({ id, ...v }));
 const asObj = v => Array.isArray(v) ? listToObj(v) : (v && typeof v === 'object' ? v : {});
+const byName = (a, b) => (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base' });
 function parseFile(f, j) {
-  if (f === 'history') return { history: asObj(j && j.history) };
-  if (f === 'people') return { people: asObj(j && j.people) };
-  if (f === 'directory') return { directory: asObj(j && j.people) };
-  return { inventory: (j && j.inventory) || {}, loans: (j && j.loans) || {} };
+  const pick = (...keys) => { for (const k of keys) if (j && j[k]) return asObj(j[k]); return {}; };
+  if (f === 'inventory') return { inventory: pick('inventory') };
+  if (f === 'loans') return { loans: pick('loans') };
+  if (f === 'borrowers') return { borrowers: pick('borrowers', 'people') };
+  if (f === 'history') return { history: pick('history') };
+  return {};
 }
 function fileText(f, d) {
   const lines = (about, key, list) => `{\n "about": ${JSON.stringify(about)},\n "${key}": [\n${list.map(e => '  ' + JSON.stringify(e)).join(',\n')}\n ]\n}\n`;
-  if (f === 'history') return lines('ICT Lab Loan Desk: every change, newest first', 'history',
+  if (f === 'inventory') return lines('ICT Lab Loan Desk: devices and components', 'inventory', objToList(d.inventory).sort(byName));
+  if (f === 'loans') return lines('ICT Lab Loan Desk: loan records, newest first', 'loans',
+    objToList(d.loans).sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || '')));
+  if (f === 'borrowers') return lines('ICT Lab Loan Desk: students and staff (imported lists and everyone who has borrowed)', 'borrowers',
+    objToList(d.borrowers).sort(byName));
+  return lines('ICT Lab Loan Desk: every change, newest first', 'history',
     objToList(d.history).sort((a, b) => (b.at || '').localeCompare(a.at || '')).slice(0, HIST_MAX));
-  if (f === 'people') return lines('ICT Lab Loan Desk: borrowers, used for name and email suggestions in New loan', 'people',
-    objToList(d.people).sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base' })));
-  if (f === 'directory') return lines('ICT Lab Loan Desk: students and staff imported from Moodle, used for name and email suggestions', 'people',
-    objToList(d.directory).sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base' })));
-  return JSON.stringify({ inventory: d.inventory, loans: d.loans }, null, 1);
 }
 async function ghGetFile(path, ref) {
   const r = await ghFetch(ghContentsUrl(path) + '?ref=' + encodeURIComponent(ref));
@@ -656,8 +661,18 @@ async function ghPull() {
   }
   ghCheck(r);
   const head = (await r.json()).object.sha;
-  const parts = await Promise.all(Object.keys(FILE_COLS).map(f => ghGetFile(ghPathOf(f), head).then(j => parseFile(f, j))));
-  GH.head = head; GH.remote = Object.assign(emptyData(), ...parts); GH.lastPull = Date.now();
+  const names = [...Object.keys(FILE_COLS), ...LEGACY_FILES];
+  const got = Object.fromEntries(await Promise.all(names.map(f => ghGetFile(ghPathOf(f), head).then(j => [f, j]))));
+  const remote = Object.assign(emptyData(), ...Object.keys(FILE_COLS).map(f => parseFile(f, got[f])));
+  // Move data from the old layout into the new files once (the next save writes them and removes the old ones).
+  const old = LEGACY_FILES.filter(f => got[f]);
+  if (old.length) {
+    if (got.data && !got.inventory && !got.loans) { remote.inventory = asObj(got.data.inventory); remote.loans = asObj(got.data.loans); }
+    if (!got.borrowers) remote.borrowers = mergeBorrowers(got.directory && got.directory.people, got.people && got.people.people);
+    GH.migrate = { remove: old.map(ghPathOf) };
+  } else GH.migrate = null;
+  GH.head = head; GH.remote = remote; GH.lastPull = Date.now();
+  if (GH.migrate) { clearTimeout(GH.timer); GH.timer = setTimeout(ghSave, 300); }
 }
 function ghApply(base, ops) {
   const next = {}; for (const c of Object.keys(emptyData())) next[c] = { ...base[c] };
@@ -669,8 +684,7 @@ function ghView() {
   S.inv = new Map(Object.entries(d.inventory).map(([k, v]) => [k, { ...v, id: k }]));
   S.loans = new Map(Object.entries(d.loans).map(([k, v]) => [k, { ...v, id: k }]));
   S.hist = new Map(Object.entries(d.history).map(([k, v]) => [k, { ...v, id: k }]));
-  S.people = new Map(Object.entries(d.people).map(([k, v]) => [k, { ...v, id: k }]));
-  S.dir = new Map(Object.entries(d.directory).map(([k, v]) => [k, { ...v, id: k }]));
+  S.borrowers = new Map(Object.entries(d.borrowers).map(([k, v]) => [k, { ...v, id: k }]));
 }
 function ghDescribe(col, id, body) {
   if (body === null) { const old = colMap(col).get(id); return `Delete ${col === 'inventory' ? 'device' : 'loan'} ${old ? (old.name || old.names || id) : id}`; }
@@ -687,7 +701,7 @@ function ghQueue(col, id, body) {
 // One commit for all changed files. Returns false when someone else saved first (then we reload and try again).
 async function ghCommit(files, message) {
   if (!GH.head) { // empty repository: the Contents API can create the first files
-    for (const f of files) {
+    for (const f of files.filter(x => !x.remove)) {
       const body = { message, content: b64enc(f.text), branch: GH.cfg.branch };
       let r = await ghSend('PUT', ghContentsUrl(f.path), body);
       if (!r.ok && (r.status === 404 || r.status === 422)) { delete body.branch; r = await ghSend('PUT', ghContentsUrl(f.path), body); }
@@ -698,7 +712,7 @@ async function ghCommit(files, message) {
   }
   const c = await (ghCheck(await ghFetch(ghRepoUrl() + '/git/commits/' + GH.head))).json();
   const tree = await (ghCheck(await ghSend('POST', ghRepoUrl() + '/git/trees',
-    { base_tree: c.tree.sha, tree: files.map(f => ({ path: f.path, mode: '100644', type: 'blob', content: f.text })) }))).json();
+    { base_tree: c.tree.sha, tree: files.map(f => f.remove ? { path: f.path, mode: '100644', type: 'blob', sha: null } : { path: f.path, mode: '100644', type: 'blob', content: f.text }) }))).json();
   const commit = await (ghCheck(await ghSend('POST', ghRepoUrl() + '/git/commits', { message, tree: tree.sha, parents: [GH.head] }))).json();
   const u = await ghSend('PATCH', ghRefUrl(), { sha: commit.sha, force: false });
   if (u.status === 409 || u.status === 422) return false;
@@ -708,21 +722,23 @@ async function ghCommit(files, message) {
 }
 async function ghSave() {
   if (GH.saving) { GH.again = true; return; }
-  if (!GH.ops.size) return;
+  if (!GH.ops.size && !GH.migrate) return;
   GH.saving = true; setSync('saving');
   const ops = new Map(GH.ops), nMsgs = GH.msgs.length;
   const who = whoAmI();
-  const first = GH.msgs[0] || 'Update history';
+  const first = GH.msgs[0] || (GH.migrate && !GH.ops.size ? 'Split data into inventory.json, loans.json, borrowers.json and history.json' : 'Update borrowers and history');
   const message = first + (nMsgs > 1 ? ` (+${nMsgs - 1} more change${nMsgs > 2 ? 's' : ''})` : '') + (who ? ` · by ${who}` : '');
   const touched = new Set([...ops.keys()].map(k => k.split('/')[0]));
   try {
     let done = false;
     for (let attempt = 0; attempt < 4 && !done; attempt++) {
       const next = ghApply(GH.remote, ops);
-      const files = Object.entries(FILE_COLS).filter(([, cols]) => cols.some(c => touched.has(c))).map(([f]) => ({ path: ghPathOf(f), text: fileText(f, next) }));
+      const migrate = GH.migrate;
+      const files = Object.entries(FILE_COLS).filter(([, cols]) => migrate || cols.some(c => touched.has(c))).map(([f]) => ({ path: ghPathOf(f), text: fileText(f, next) }));
+      if (migrate) for (const p of migrate.remove) files.push({ path: p, remove: true });
       const wasEmpty = !GH.head;
       if (await ghCommit(files, message)) {
-        GH.remote = next; GH.lastPull = Date.now();
+        GH.remote = next; GH.lastPull = Date.now(); GH.migrate = null;
         if (wasEmpty) await ghPull();
         for (const [k, v] of ops) if (GH.ops.get(k) === v) GH.ops.delete(k);
         GH.msgs = GH.msgs.slice(nMsgs);
@@ -737,7 +753,7 @@ async function ghSave() {
     setSync('error'); toast('Not saved to GitHub. ' + ghExplain(e), 'bad');
   } finally {
     GH.saving = false;
-    if (GH.again || GH.ops.size && GH.state !== 'error') { GH.again = false; clearTimeout(GH.timer); GH.timer = setTimeout(ghSave, 400); }
+    if (GH.again || (GH.ops.size || GH.migrate) && GH.state !== 'error') { GH.again = false; clearTimeout(GH.timer); GH.timer = setTimeout(ghSave, 400); }
   }
 }
 function setSync(state) {
@@ -906,7 +922,7 @@ $('#loginForm').addEventListener('submit', async e => {
 });
 function signOut(note) {
   ghSaveCfg(null); GH.cfg = null; GH.ops = new Map(); GH.msgs = []; GH.head = null; GH.remote = emptyData();
-  S.inv = new Map(); S.loans = new Map(); S.hist = new Map(); S.people = new Map(); S.dir = new Map(); S.ready = false; S.mode = 'starting'; S.lastSaved = null; S.openLoan = null;
+  S.inv = new Map(); S.loans = new Map(); S.hist = new Map(); S.borrowers = new Map(); S.ready = false; S.mode = 'starting'; S.lastSaved = null; S.openLoan = null;
   renderAll(); showGate(note);
 }
 function openAccountPanel() {
@@ -1043,7 +1059,7 @@ window.addEventListener('focus', ghRefresh);
 document.addEventListener('visibilitychange', () => { if (!document.hidden) ghRefresh(); });
 
 const chains = {};
-const colMap = col => ({ inventory: S.inv, loans: S.loans, history: S.hist, people: S.people, directory: S.dir })[col];
+const colMap = col => ({ inventory: S.inv, loans: S.loans, history: S.hist, borrowers: S.borrowers })[col];
 function writeDoc(col, id, data, before) {
   const map = colMap(col);
   const body = { ...data }; delete body.id;
@@ -1101,30 +1117,69 @@ function logChange(col, old, body) {
   writeDoc('history', uid(), { at: new Date().toISOString(), by: whoAmI(), type: col === 'inventory' ? 'inventory' : 'loan', action: d.action, text: d.text });
 }
 
-/* ---------- people: borrowers remembered for name and email suggestions ---------- */
+/* ---------- borrowers: students and staff (imported lists plus everyone typed into a loan) ---------- */
 const personKey = n => String(n || '').trim().toLowerCase().replace(/\s+/g, ' ');
 function personId(n) { let h = 2166136261; for (const ch of personKey(n)) { h ^= ch.codePointAt(0); h = Math.imul(h, 16777619); } return 'p' + (h >>> 0).toString(36); }
-function rememberPerson(l, newLoan) {
-  if (!personKey(l.names)) return;
-  const id = personId(l.names), old = S.people.get(id) || {};
-  const p = { name: l.names.trim(), email: emailIn(l.contact) || old.email || '', contact: l.contact || old.contact || '',
-    group: l.group || old.group || '', course: l.course || old.course || '', lastLoan: l.ref || old.lastLoan || '',
-    lastAt: newLoan ? new Date().toISOString() : (old.lastAt || l.createdAt || ''), loans: (old.loans || 0) + (newLoan ? 1 : 0) };
-  if (!newLoan && old.email === p.email && old.contact === p.contact) return;
-  writeDoc('people', id, p);
-}
-// Saved people first; older loans fill in anyone not saved yet.
-function peopleList() {
-  const m = new Map();
-  for (const d of S.dir.values()) { const k = personKey(d.name); if (k && !m.has(k)) m.set(k, { ...d, loans: 0 }); }
-  for (const l of [...S.loans.values()].sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || ''))) {
-    const k = personKey(l.names); if (!k) continue;
-    const o = m.get(k) || { loans: 0 };
-    m.set(k, { ...o, name: l.names.trim(), email: emailIn(l.contact) || o.email || '', contact: l.contact || o.contact || '',
-      group: l.group || o.group || '', course: l.course || o.course || '', lastAt: l.createdAt || o.lastAt || '', loans: o.loans + 1 });
+// Same id for the same email, so importing a list again updates people instead of adding them twice.
+const borrowerId = (email, name) => email ? 'd' + personId(email.toLowerCase()).slice(1) : 'n' + personId(name).slice(1);
+const guessRole = email => /@edu\.karelia\.fi$/i.test(email) ? 'student' : /@karelia\.fi$/i.test(email) ? 'staff' : 'other';
+// Old layout: directory.json (imported) + people.json (typed in loans) -> one borrowers list.
+function mergeBorrowers(directory, people) {
+  const out = {};
+  for (const [id, v] of Object.entries(asObj(directory))) out[id] = { source: 'imported', ...v };
+  for (const p of Object.values(asObj(people))) {
+    const email = emailIn(p.contact) || p.email || '';
+    const id = borrowerId(email, p.name), o = out[id] || {};
+    out[id] = { ...o, name: o.name || p.name, email: o.email || email, contact: p.contact || o.contact || '', group: p.group || o.group || '',
+      course: p.course || o.course || '', role: o.role || guessRole(email), source: o.source || 'added', added: o.added || p.lastAt || '' };
   }
-  for (const p of S.people.values()) { const k = personKey(p.name); if (k) m.set(k, { ...m.get(k), ...p, loans: Math.max(p.loans || 0, (m.get(k) || {}).loans || 0) }); }
-  return [...m.values()];
+  return out;
+}
+function findBorrower(name, email) {
+  const e = (email || '').toLowerCase(), k = personKey(name);
+  let byName = null;
+  for (const b of S.borrowers.values()) {
+    if (e && (b.email || '').toLowerCase() === e) return b;
+    if (!byName && k && personKey(b.name) === k && (!e || !b.email)) byName = b;
+  }
+  return byName;
+}
+// Anyone typed into a loan who is not on the list yet is added to it; known people get their latest group, course and contact.
+function rememberBorrower(l) {
+  const name = (l.names || '').trim(); if (!name) return;
+  const email = emailIn(l.contact), old = findBorrower(name, email);
+  if (!old) {
+    writeDoc('borrowers', borrowerId(email, name), { name, email, contact: l.contact || '', group: l.group || '', course: l.course || '',
+      role: guessRole(email), source: 'added', added: new Date().toISOString() });
+    return;
+  }
+  const upd = { ...old, email: old.email || email, contact: l.contact || old.contact || '', group: l.group || old.group || '', course: l.course || old.course || '' };
+  delete upd.id;
+  if (['email', 'contact', 'group', 'course'].some(k => (upd[k] || '') !== (old[k] || ''))) writeDoc('borrowers', old.id, upd);
+}
+// Everyone for the suggestions, with how often and when they last borrowed.
+function peopleList() {
+  const stats = new Map();
+  for (const l of S.loans.values()) {
+    for (const key of [emailIn(l.contact).toLowerCase(), personKey(l.names)].filter(Boolean)) {
+      const s = stats.get(key) || { loans: 0, lastAt: '', l: null };
+      s.loans++; if ((l.createdAt || '') >= s.lastAt) { s.lastAt = l.createdAt || ''; s.l = l; }
+      stats.set(key, s);
+    }
+  }
+  const seen = new Set(), out = [];
+  for (const b of S.borrowers.values()) {
+    const s = stats.get((b.email || '').toLowerCase()) || stats.get(personKey(b.name)) || { loans: 0, lastAt: '' };
+    out.push({ ...b, loans: s.loans, lastAt: s.lastAt });
+    seen.add(personKey(b.name)); if (b.email) seen.add(b.email.toLowerCase());
+  }
+  // loans saved before the borrowers list existed
+  for (const [key, s] of stats) {
+    const l = s.l; if (!l || seen.has(personKey(l.names)) || seen.has(emailIn(l.contact).toLowerCase())) continue;
+    seen.add(personKey(l.names)); if (emailIn(l.contact)) seen.add(emailIn(l.contact).toLowerCase());
+    out.push({ name: l.names.trim(), email: emailIn(l.contact), contact: l.contact || '', group: l.group || '', course: l.course || '', loans: s.loans, lastAt: s.lastAt });
+  }
+  return out;
 }
 
 function goLocal(msg) {
@@ -1173,8 +1228,7 @@ async function startStorage() {
     if (!snap.metadata.fromCache) gotLoans = true; settle();
   }, fail('loans'));
   db.collection('history').onSnapshot(snap => { S.hist = new Map(snap.docs.map(d => [d.id, { ...d.data(), id: d.id }])); renderAll(); }, () => {});
-  db.collection('directory').onSnapshot(snap => { S.dir = new Map(snap.docs.map(d => [d.id, { ...d.data(), id: d.id }])); renderAll(); }, () => {});
-  db.collection('people').onSnapshot(snap => { S.people = new Map(snap.docs.map(d => [d.id, { ...d.data(), id: d.id }])); renderAll(); }, () => {});
+  db.collection('borrowers').onSnapshot(snap => { S.borrowers = new Map(snap.docs.map(d => [d.id, { ...d.data(), id: d.id }])); renderAll(); }, () => {});
 }
 
 /* ---------- derived ---------- */
@@ -1632,7 +1686,7 @@ $('#loanForm').addEventListener('submit', async e => {
   const ok = await writeDoc('loans', id, loan);
   $('#lnSave').disabled = false;
   if (!ok) return;
-  rememberPerson(loan, true);
+  rememberBorrower(loan);
   S.lastSaved = { ...loan, id };
   resetLoanForm(); renderSaved();
   window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -1937,7 +1991,7 @@ async function saveLoanEmail(l, raw) {
   if (!addr) { toast('That does not look like an email address.', 'bad'); return false; }
   const contact = l.contact && !emailIn(l.contact) ? `${addr}, ${l.contact}` : addr;
   const ok = await writeDoc('loans', l.id, { ...l, contact });
-  if (ok) rememberPerson({ ...l, contact }, false);
+  if (ok) rememberBorrower({ ...l, contact });
   return ok;
 }
 
@@ -2208,17 +2262,21 @@ async function importDirectory(file) {
   if (list === null) { toast('That file has no "Full name" and "Email address" columns.', 'bad'); return; }
   if (!list.length) { toast('No names with email addresses found in that file.', 'bad'); return; }
   const now = new Date().toISOString();
-  const entries = list.map(p => ['d' + personId(p.email.toLowerCase()).slice(1), { ...p, imported: now }]);
-  const added = entries.filter(([id]) => !S.dir.has(id)).length;
-  if (bulkWrite('directory', entries, `Import ${list.length} ${list.length === 1 ? "person" : "people"} from ${file.name}`)) {
-    writeDoc('history', uid(), { at: now, by: whoAmI(), type: 'people', action: 'People list imported', text: `${file.name}: ${list.length} people (${added} new)` });
+  const entries = list.map(p => {
+    const id = borrowerId(p.email, p.name), old = S.borrowers.get(id) || {};
+    const v = { ...old, ...p, contact: old.contact || '', group: old.group || '', course: old.course || '', source: 'imported', imported: now };
+    delete v.id; return [id, v];
+  });
+  const added = entries.filter(([id]) => !S.borrowers.has(id)).length;
+  if (bulkWrite('borrowers', entries, `Import ${list.length} ${list.length === 1 ? "person" : "people"} from ${file.name}`)) {
+    writeDoc('history', uid(), { at: now, by: whoAmI(), type: 'borrowers', action: 'Borrower list imported', text: `${file.name}: ${list.length} people (${added} new)` });
     toast(`Imported ${list.length} people (${added} new). Their names and emails are now suggested.`);
   }
 }
 $('#dirImport').addEventListener('click', () => $('#dirFile').click());
 $('#dirFile').addEventListener('change', e => { const f = e.target.files[0]; e.target.value = ''; if (f) importDirectory(f); });
 function renderDirInfo() {
-  const n = S.dir.size; $('#dirInfo').textContent = n ? `${n} students and staff listed` : '';
+  const n = S.borrowers.size; $('#dirInfo').textContent = n ? `${n} people in the borrower list` : '';
 }
 
 $('#lnStart').addEventListener('change', () => {
