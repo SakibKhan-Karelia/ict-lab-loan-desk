@@ -249,7 +249,7 @@ tr.confirm td{background:var(--bad-soft)}
     </nav>
     <dl class="side-stats" id="stats"></dl>
     <div class="tools">
-      <button class="tool" id="usersBtn" type="button" hidden><svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><circle cx="6" cy="5" r="2.6" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M1.5 14c.4-2.7 2.2-4.2 4.5-4.2s4.1 1.5 4.5 4.2M11 3.2a2.4 2.4 0 010 4.6M12.6 9.9c1.1.6 1.8 1.9 2 4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>Helpers</button>
+      <button class="tool" id="usersBtn" type="button" hidden><svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><circle cx="6" cy="5" r="2.6" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M1.5 14c.4-2.7 2.2-4.2 4.5-4.2s4.1 1.5 4.5 4.2M11 3.2a2.4 2.4 0 010 4.6M12.6 9.9c1.1.6 1.8 1.9 2 4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>Users</button>
       <button class="tool" id="storageBtn" type="button" hidden></button>
       <button class="tool" id="themeBtn" type="button" title="Switch between automatic, light and dark theme"></button>
     </div>
@@ -307,18 +307,18 @@ tr.confirm td{background:var(--bad-soft)}
 
       <!-- HELPERS (owner) -->
       <section id="usersPanel" class="panel" hidden style="margin-bottom:20px">
-        <div class="panel-head"><h2>Helpers</h2><button class="btn small" type="button" id="usersClose">Close</button></div>
-        <p class="sheet-note" style="max-width:80ch">Helpers sign in with a username and password. They can use the whole app: inventory, loans and return checks. They can't manage helpers. Every change they save shows their username.</p>
+        <div class="panel-head"><h2>Users</h2><button class="btn small" type="button" id="usersClose">Close</button></div>
+        <p class="sheet-note" style="max-width:80ch">Users sign in with a username and password. They can use the whole app: inventory, loans and return checks. They can't manage users. Every change they save shows their username.</p>
         <div id="helperTokenBox" style="margin-top:14px"></div>
         <div id="usersList" style="margin-top:14px"></div>
         <form class="form" id="addUserForm" autocomplete="off" style="margin-top:16px">
-          <h3>Add a helper</h3>
+          <h3>Add a user</h3>
           <div class="row3">
             <div class="field"><label for="newUser">Username</label><input type="text" id="newUser" autocapitalize="none" spellcheck="false" placeholder="e.g. anna" required></div>
             <div class="field"><label for="newPass">Password</label><input type="password" id="newPass" autocomplete="new-password" placeholder="At least 12 characters" required></div>
             <div class="field"><label for="newPass2">Repeat password</label><input type="password" id="newPass2" autocomplete="new-password" required></div>
           </div>
-          <div class="actions"><button type="submit" class="btn primary" id="addUserBtn">Add helper</button><span class="sheet-note" id="usersMsg" role="status"></span></div>
+          <div class="actions"><button type="submit" class="btn primary" id="addUserBtn">Add user</button><span class="sheet-note" id="usersMsg" role="status"></span></div>
         </form>
       </section>
 
@@ -750,7 +750,7 @@ async function accessWrite(json, sha, message) {
   const r = await ghFetch(siteFileUrl(), { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
   if (r.status === 401) throw new GhError('auth');
   if (r.status === 403 || r.status === 404) throw new GhError('siteperm');
-  if (r.status === 409 || r.status === 422) throw new GhError('http', 'the helper list changed at the same time, try again');
+  if (r.status === 409 || r.status === 422) throw new GhError('http', 'the user list changed at the same time, try again');
   if (!r.ok) throw new GhError('http', 'HTTP ' + r.status);
 }
 
@@ -782,7 +782,7 @@ $('#loginForm').addEventListener('submit', async e => {
     try { await ghPull(); }
     catch (err) {
       GH.cfg = null;
-      msg.textContent = err.kind === 'auth' ? 'Your login is correct, but the helper access has expired. Ask the lab owner to renew it.' : ghExplain(err);
+      msg.textContent = err.kind === 'auth' ? 'Your login is correct, but user access has expired. Ask the lab owner to renew it.' : ghExplain(err);
       return;
     }
     ghSaveCfg(cfg, $('#loginKeep').checked);
@@ -819,7 +819,7 @@ S.helpers = { list: null, sha: null, busy: false, confirm: null, reset: null };
 async function openUsersPanel() {
   $('#usersPanel').hidden = false; $('#ghPanel').hidden = true;
   $('#usersPanel').scrollIntoView({ behavior: 'smooth', block: 'start' });
-  $('#usersList').innerHTML = '<p class="sheet-note">Loading helpers…</p>';
+  $('#usersList').innerHTML = '<p class="sheet-note">Loading users…</p>';
   renderHelperToken();
   try { const a = await accessRead(); S.helpers.list = a.json; S.helpers.sha = a.sha; renderUsers(); }
   catch (e) { $('#usersList').innerHTML = `<p class="sheet-note" style="color:var(--bad)">${esc(ghExplain(e))}</p>`; }
@@ -827,15 +827,15 @@ async function openUsersPanel() {
 function renderHelperToken() {
   const has = !!(GH.cfg && GH.cfg.helperToken);
   $('#helperTokenBox').innerHTML = has
-    ? `<p class="sheet-note">Helper access token: <b>saved in this browser</b>. <button type="button" class="link-btn" id="htChange">Replace it</button></p>`
-    : `<div class="field" style="max-width:640px"><label for="htInput">Helper access token</label>
+    ? `<p class="sheet-note">User access token: <b>saved in this browser</b>. <button type="button" class="link-btn" id="htChange">Replace it</button></p>`
+    : `<div class="field" style="max-width:640px"><label for="htInput">User access token</label>
         <input type="password" id="htInput" placeholder="github_pat_…" autocomplete="off">
-        <span class="hint">A second token just for helpers: on GitHub choose “Only select repositories” → <b>ict-lab-loan-data</b> only, Contents “Read and write”. Don't use your own token here.</span></div>
-       <div class="actions" style="margin-top:8px"><button type="button" class="btn" id="htSave">Save helper token</button></div>`;
+        <span class="hint">A second token just for users: on GitHub choose “Only select repositories” → <b>ict-lab-loan-data</b> only, Contents “Read and write”. Don't use your own token here.</span></div>
+       <div class="actions" style="margin-top:8px"><button type="button" class="btn" id="htSave">Save user token</button></div>`;
 }
 function renderUsers() {
   const users = (S.helpers.list && S.helpers.list.users) || [];
-  if (!users.length) { $('#usersList').innerHTML = '<p class="sheet-note">No helpers yet.</p>'; return; }
+  if (!users.length) { $('#usersList').innerHTML = '<p class="sheet-note">No users yet.</p>'; return; }
   $('#usersList').innerHTML = `<div class="table-wrap"><table>
     <thead><tr><th>Username</th><th>Added</th><th></th></tr></thead>
     <tbody>${users.map(u => {
@@ -850,7 +850,7 @@ function renderUsers() {
 }
 function needHelperToken() {
   if (GH.cfg && GH.cfg.helperToken) return GH.cfg.helperToken;
-  $('#usersMsg').textContent = 'Save the helper access token first.'; const i = $('#htInput'); if (i) i.focus();
+  $('#usersMsg').textContent = 'Save the user access token first.'; const i = $('#htInput'); if (i) i.focus();
   return null;
 }
 async function saveUsers(mutate, message, okText) {
@@ -881,14 +881,14 @@ $('#helperTokenBox').addEventListener('click', async e => {
   if (e.target.id === 'htChange') { GH.cfg.helperToken = ''; renderHelperToken(); const i = $('#htInput'); if (i) i.focus(); return; }
   if (e.target.id !== 'htSave') return;
   const t = $('#htInput').value.trim();
-  if (!t) { $('#usersMsg').textContent = 'Paste the helper token first.'; return; }
-  if (t === GH.cfg.token) { $('#usersMsg').textContent = 'That is your own token. Create a separate token for helpers.'; return; }
-  $('#usersMsg').textContent = 'Checking the helper token…';
+  if (!t) { $('#usersMsg').textContent = 'Paste the user token first.'; return; }
+  if (t === GH.cfg.token) { $('#usersMsg').textContent = 'That is your own token. Create a separate token for users.'; return; }
+  $('#usersMsg').textContent = 'Checking the user token…';
   const check = await fetch(ghFileUrl() + '?ref=' + encodeURIComponent(GH.cfg.branch), { cache: 'no-store', headers: { Authorization: 'Bearer ' + t, Accept: 'application/vnd.github+json' } }).catch(() => null);
   if (!check || !(check.ok || check.status === 404)) { $('#usersMsg').textContent = 'GitHub refused that token. Check that it can read and write ict-lab-loan-data.'; return; }
   const hadUsers = !!(S.helpers.list && S.helpers.list.users.length);
   GH.cfg.helperToken = t; ghSaveCfg(GH.cfg, true); renderHelperToken();
-  $('#usersMsg').textContent = hadUsers ? 'Helper token saved. Existing helpers still use the old token: give each of them a new password so they get the new one.' : 'Helper token saved. Now add a helper.';
+  $('#usersMsg').textContent = hadUsers ? 'User token saved. Existing users still use the old token: give each of them a new password so they get the new one.' : 'User token saved. Now add a user.';
 });
 $('#addUserForm').addEventListener('submit', async e => {
   e.preventDefault();
@@ -897,10 +897,10 @@ $('#addUserForm').addEventListener('submit', async e => {
   if (!/^[a-z0-9._-]{2,32}$/.test(name)) { $('#usersMsg').textContent = 'Usernames use 2–32 letters, digits, dots, dashes or underscores.'; return; }
   const bad = checkPassword(pw, pw2); if (bad) { $('#usersMsg').textContent = bad; return; }
   const ok = await saveUsers(async json => {
-    if (json.users.some(u => u.name === name)) throw new Error(`There is already a helper called “${name}”.`);
+    if (json.users.some(u => u.name === name)) throw new Error(`There is already a user called “${name}”.`);
     json.users.push({ id: uid(), name, created: new Date().toISOString(), ...(await sealToken(token, pw, name)) });
-  }, `Add helper ${name}`, `Added ${name}.`);
-  if (ok) { $('#addUserForm').reset(); toast(`Helper ${name} added`); }
+  }, `Add user ${name}`, `Added ${name}.`);
+  if (ok) { $('#addUserForm').reset(); toast(`User ${name} added`); }
 });
 $('#usersList').addEventListener('click', async e => {
   const b = e.target.closest('[data-hu]'); if (!b) return;
@@ -910,16 +910,16 @@ $('#usersList').addEventListener('click', async e => {
     case 'reset': S.helpers.reset = id; S.helpers.confirm = null; renderUsers(); break;
     case 'cancel': S.helpers.confirm = null; S.helpers.reset = null; renderUsers(); break;
     case 'del-yes':
-      if (await saveUsers(async json => { json.users = json.users.filter(x => x.id !== id); }, `Remove helper ${u ? u.name : id}`, `Removed ${u ? u.name : 'the helper'}.`))
-        toast('Helper removed');
+      if (await saveUsers(async json => { json.users = json.users.filter(x => x.id !== id); }, `Remove user ${u ? u.name : id}`, `Removed ${u ? u.name : 'the user'}.`))
+        toast('User removed');
       break;
     case 'reset-save': {
       const token = needHelperToken(); if (!token) return;
       const pw = $('#resetPass').value, bad = checkPassword(pw); if (bad) { $('#usersMsg').textContent = bad; return; }
       if (await saveUsers(async json => {
-        const t = json.users.find(x => x.id === id); if (!t) throw new Error('That helper no longer exists.');
+        const t = json.users.find(x => x.id === id); if (!t) throw new Error('That user no longer exists.');
         Object.assign(t, await sealToken(token, pw, t.name));
-      }, `New password for ${u ? u.name : id}`, `New password saved for ${u ? u.name : 'the helper'}.`)) toast('Password changed');
+      }, `New password for ${u ? u.name : id}`, `New password saved for ${u ? u.name : 'the user'}.`)) toast('Password changed');
       break;
     }
   }
