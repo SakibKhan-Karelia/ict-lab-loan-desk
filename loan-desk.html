@@ -367,7 +367,7 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
             <select id="fField">
               <option value="all">All fields</option>
               <option value="name">Device name</option>
-              <option value="serial">Serial / asset no.</option>
+              <option value="serial">Serial number</option>
               <option value="notes">Notes</option>
             </select></div>
           <div class="actions adv-actions"><button class="btn" type="button" id="fClear">Clear filters</button><button class="btn" type="button" id="advClose" title="Hide advanced search (filters stay on)">Close</button><span class="sheet-note" id="fCount"></span></div>
@@ -375,9 +375,9 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
         <form class="box" id="invForm" autocomplete="off">
           <div class="add-bar-title"><h2 id="invFormTitle">Add device</h2></div>
           <div class="add-bar">
-            <div class="field"><label for="invName">Device / component name</label><input type="text" id="invName" required placeholder="e.g. Raspberry Pi 4 Model B"></div>
+            <div class="field"><label for="invName">Device/Component</label><input type="text" id="invName" required placeholder="e.g. Raspberry Pi 4 Model B"></div>
             <div class="field"><div class="label-row"><label for="invCat">Category</label><button type="button" class="link-btn" id="catManage" aria-controls="catPanel" aria-expanded="false">Manage</button></div><input type="text" id="invCat" list="catList" placeholder="e.g. Microcontrollers"><datalist id="catList"></datalist></div>
-            <div class="field"><label for="invSerial">Serial / asset no.</label><input type="text" id="invSerial" placeholder="Optional"></div>
+            <div class="field"><label for="invSerial">Serial number</label><input type="text" id="invSerial" placeholder="Optional"></div>
             <div class="field"><label for="invTotal">In stock</label><div class="num-step"><button type="button" class="icon" data-step="-1" aria-label="One less">−</button><input type="number" id="invTotal" min="0" step="1" value="1" inputmode="numeric" required><button type="button" class="icon" data-step="1" aria-label="One more">+</button></div></div>
             <div class="field"><label for="invNotes">Notes</label><input type="text" id="invNotes" placeholder="Shelf, condition, accessories…"></div>
             <div class="actions">
@@ -424,7 +424,7 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
           <div class="box">
             <div class="box-head"><h2>Equipment</h2><span class="sheet-note">The paper record fits 10 lines per page.</span></div>
             <div class="picker">
-              <div class="field"><label for="pkItem">Device</label><select id="pkItem"></select></div>
+              <div class="field"><label for="pkItem">Device/Component</label><select id="pkItem"></select></div>
               <div class="field"><label for="pkQty">Number</label><div class="num-step"><button type="button" class="icon" data-step="-1" aria-label="One less">−</button><input type="number" id="pkQty" min="1" step="1" value="1" inputmode="numeric"><button type="button" class="icon" data-step="1" aria-label="One more">+</button></div></div>
               <div class="field"><label for="pkSerial">Serial number</label><input type="text" id="pkSerial" placeholder="Optional"></div>
               <button type="button" class="btn accent" id="pkAdd">Add to loan</button>
@@ -1318,7 +1318,7 @@ function renderInventory() {
   if (!rows.length) { box.innerHTML = bar + `<div class="empty"><strong>No match</strong><span>No devices match this search. Try other words or clear the filters.</span></div>`; return; }
   const shownSel = rows.filter(i => S.sel.has(i.id)).length;
   box.innerHTML = bar + `<div class="table-wrap"><table>
-    <thead><tr>${S.selMode ? '<th class="sel-td"><span class="visually-hidden">Select</span></th>' : ''}<th>Device</th><th>Category</th><th>Serial / asset</th><th class="ctr">In stock</th><th class="num">On loan</th><th class="num">Available</th>
+    <thead><tr>${S.selMode ? '<th class="sel-td"><span class="visually-hidden">Select</span></th>' : ''}<th>Device/Component</th><th>Category</th><th>Serial number</th><th class="ctr">In stock</th><th class="num">On loan</th><th class="num">Available</th>
       <th class="sort-th"><label class="sort-by">Sort by <select id="invSort">${SORT_OPTIONS.map(([v, t]) => `<option value="${v}"${v === S.sort ? ' selected' : ''}>${t}</option>`).join('')}</select></label></th></tr></thead>
     <tbody>${rows.map(i => {
       const ol = onLoan[i.id] || 0, av = (i.total || 0) - ol;
@@ -1641,7 +1641,7 @@ function renderDraft() {
   const box = $('#draftTable');
   if (!S.draft.length) { box.innerHTML = `<div class="empty"><strong>Nothing added yet</strong><span>Choose a device, set the number, and press “Add to loan”.</span></div>`; return; }
   box.innerHTML = `<div class="table-wrap"><table>
-    <thead><tr><th>Item</th><th>Device / component name</th><th>Serial number</th><th class="ctr">Number</th><th></th></tr></thead>
+    <thead><tr><th>Item</th><th>Device/Component</th><th>Serial number</th><th class="ctr">Number</th><th></th></tr></thead>
     <tbody>${S.draft.map((d, i) => `<tr><td class="mono">${i + 1}</td><td class="dev-name">${esc(d.name)}</td>
       <td>${d.serial ? `<span class="serial">${esc(d.serial)}</span>` : '<span class="muted">–</span>'}</td>
       <td class="ctr mono">${d.qty}</td><td class="num"><button type="button" class="btn small danger" data-rm="${d.key}">Remove</button></td></tr>`).join('')}</tbody></table></div>`;
@@ -1912,7 +1912,7 @@ function renderDetail() {
     <h3 style="margin-bottom:6px">Return check</h3>
     <p class="sheet-note" style="margin:0 0 8px">Enter how many of each item came back. Rows still missing something are marked on the left.</p>
     <div class="table-wrap"><table>
-      <thead><tr><th>Device</th><th class="ctr">Lent</th><th class="ctr">Back</th><th></th></tr></thead>
+      <thead><tr><th>Device/Component</th><th class="ctr">Lent</th><th class="ctr">Back</th><th></th></tr></thead>
       <tbody>${l.items.map((it, i) => {
         const back = rd.qty[i], done = back >= it.qty;
         return `<tr class="ret-row ${done ? 'done' : 'miss'}"><td><div class="dev-name">${esc(it.name)}</div>${it.serial ? `<span class="serial">${esc(it.serial)}</span>` : ''}</td>
@@ -2149,7 +2149,7 @@ async function exportInventory(items, filename) {
   if (!items.length) { toast('Nothing to export.', 'bad'); return; }
   if (!window.ExcelJS) { toast('The Excel tool did not load. Reload the page and try again.', 'bad'); return; }
   const wb = new ExcelJS.Workbook(), ws = wb.addWorksheet('Inventory');
-  ws.columns = [{ header: 'Device / component', width: 38 }, { header: 'Category', width: 20 }, { header: 'Serial / asset no.', width: 22 },
+  ws.columns = [{ header: 'Device/Component', width: 38 }, { header: 'Category', width: 20 }, { header: 'Serial number', width: 22 },
     { header: 'In stock', width: 10 }, { header: 'On loan', width: 10 }, { header: 'Available', width: 11 }, { header: 'Notes', width: 40 }];
   ws.getRow(1).font = { bold: true };
   const ol = onLoanMap();
