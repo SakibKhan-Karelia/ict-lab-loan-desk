@@ -155,6 +155,7 @@ The app uses [jsPDF](https://github.com/parallax/jsPDF) for PDF files and [Excel
 
 New features are listed here, newest first.
 
+- **2026-11-06**: GitHub storage panel simplified: no instruction text and no Data file box (the four data files are always at the top of the data repository).
 - **2026-11-06**: Moved to the `ictlabloandesk` GitHub organisation; the site is now at https://ictlabloandesk.github.io/.
 - **2026-11-05**: History columns renamed (Timestamp, User, Action, Description); Export to Excel on the History page.
 - **2026-11-05**: Borrower email: removed the attachment line and the sign-off.

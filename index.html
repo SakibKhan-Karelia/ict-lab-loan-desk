@@ -299,21 +299,13 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
       <!-- GITHUB STORAGE SETTINGS (only outside the Claude viewer) -->
       <section id="ghPanel" class="panel" hidden style="margin-bottom:20px">
         <div class="panel-head"><h2>Save data to a private GitHub repository</h2><button class="btn small" type="button" id="ghClose">Close</button></div>
-        <ol class="steps">
-          <li>On GitHub, create a <b>private</b> repository for the data, for example <span class="code">ict-lab-loan-data</span>. It can be empty.</li>
-          <li>Create a <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">fine-grained access token</a>: set <b>Resource owner</b> to <span class="code">ictlabloandesk</span>, choose “Only select repositories” and pick that data repository, then under Repository permissions set <b>Contents</b> to “Read and write”.</li>
-          <li>Paste the token below and press Connect. The token stays in this browser only; repeat this on each computer you use.</li>
-        </ol>
         <form class="form" id="ghForm" autocomplete="off" style="margin-top:14px">
-          <div class="row2">
+          <div class="row3">
             <div class="field"><label for="ghOwner">GitHub account</label><input type="text" id="ghOwner" required value="ictlabloandesk"></div>
             <div class="field"><label for="ghRepo">Data repository</label><input type="text" id="ghRepo" required value="ict-lab-loan-data"></div>
-          </div>
-          <div class="row2">
             <div class="field"><label for="ghBranch">Branch</label><input type="text" id="ghBranch" required value="main"></div>
-            <div class="field"><label for="ghPath">Data file</label><input type="text" id="ghPath" required value="data.json"></div>
           </div>
-          <div class="field"><label for="ghToken">Access token</label><input type="password" id="ghToken" placeholder="github_pat_…" autocomplete="off"><span class="hint" id="ghTokenHint">Never share this token or put it in the public website repository.</span></div>
+          <div class="field"><label for="ghToken">Access token</label><input type="password" id="ghToken" placeholder="github_pat_…" autocomplete="off"></div>
           <div class="actions">
             <button type="submit" class="btn primary" id="ghConnect">Connect</button>
             <button type="button" class="btn danger" id="ghDisconnect" hidden>Disconnect this browser</button>
@@ -782,11 +774,11 @@ $('#storageBtn').addEventListener('click', () => {
 });
 function openGhPanel() {
   const c = GH.cfg || ghLoadCfg();
-  if (c) { $('#ghOwner').value = c.owner; $('#ghRepo').value = c.repo; $('#ghBranch').value = c.branch; $('#ghPath').value = c.path; }
+  if (c) { $('#ghOwner').value = c.owner; $('#ghRepo').value = c.repo; $('#ghBranch').value = c.branch; }
   $('#ghToken').value = '';
   $('#ghToken').placeholder = c ? 'Saved in this browser. Paste a new token to replace it.' : 'github_pat_…';
   $('#ghDisconnect').hidden = S.mode !== 'github';
-  $('#ghMsg').textContent = S.mode === 'github' ? `Connected to ${GH.cfg.owner}/${GH.cfg.repo}.` : '';
+  $('#ghMsg').textContent = '';
   $('#ghPanel').hidden = false;
   $('#ghPanel').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
@@ -796,7 +788,7 @@ $('#ghForm').addEventListener('submit', async e => {
   const prev0 = GH.cfg || ghLoadCfg();
   const prev = prev0 && prev0.role === 'helper' ? null : prev0; // a helper's sign-in is never reused as the owner's connection
   const cfg = { owner: $('#ghOwner').value.trim(), repo: $('#ghRepo').value.trim(), branch: $('#ghBranch').value.trim() || 'main',
-    path: $('#ghPath').value.trim().replace(/^\/+/, '') || 'data.json', token: $('#ghToken').value.trim() || (prev && prev.token) || '' };
+    path: (prev && prev.path) || 'data.json', token: $('#ghToken').value.trim() || (prev && prev.token) || '' };
   if (prev && prev.helperToken) cfg.helperToken = prev.helperToken;
   if (!cfg.token) { $('#ghMsg').textContent = 'Paste your access token first.'; return; }
   $('#ghConnect').disabled = true; $('#ghMsg').textContent = 'Connecting…';
