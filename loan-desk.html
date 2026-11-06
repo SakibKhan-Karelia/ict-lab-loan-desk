@@ -216,6 +216,12 @@ tr.confirm td{background:var(--bad-soft)}
 .picker{display:grid;grid-template-columns:minmax(0,2fr) 140px minmax(0,1.3fr) auto;gap:10px;align-items:end;padding:14px 18px;border-bottom:1px solid var(--line);background:var(--sunken)}
 @media (max-width:640px){.picker{grid-template-columns:minmax(0,1fr) 140px}.picker .field:nth-child(3){grid-column:1/-1}.picker .btn{grid-column:1/-1;justify-content:center}}
 .form-foot{display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:flex-end;padding:14px 18px;border-top:1px solid var(--line)}
+.member-list{display:grid;gap:10px}
+.member-list:empty{display:none}
+.member-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) 34px;gap:14px;align-items:end}
+.member-row .rm{height:36px;width:34px;border:1px solid var(--line-strong);background:var(--surface);border-radius:3px;color:var(--muted);font-size:1.15rem;cursor:pointer}
+.member-row .rm:hover{background:var(--bad-soft);color:var(--bad)}
+@media (max-width:640px){.member-row{grid-template-columns:minmax(0,1fr) 34px}.member-row .field:nth-child(2){grid-column:1/2}}
 .req-box{border:1px solid color-mix(in srgb,var(--accent) 45%,var(--line));background:var(--info-soft);border-radius:4px;padding:14px 18px;display:grid;gap:8px}
 .req-box ul{margin:0;padding-left:20px}
 .req-box .warn-list li{color:var(--warn)}
@@ -408,7 +414,13 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
           <div class="box">
             <div class="box-head"><h2>Borrower</h2><div class="actions"><span class="sheet-note" id="dirInfo"></span></div></div>
             <div class="box-pad form">
-              <div class="field"><label for="lnNames">Name(s)</label><input type="text" id="lnNames" required placeholder="Borrower name(s), separated by commas"></div>
+              <div class="member-row">
+                <div class="field"><label for="lnNames">Name</label><input type="text" id="lnNames" required placeholder="Borrower name"></div>
+                <div class="field"><label for="lnContact">Email (or phone)</label><input type="text" id="lnContact" placeholder="e.g. firstname.lastname@edu.karelia.fi"></div>
+                <span aria-hidden="true"></span>
+              </div>
+              <div id="memberList" class="member-list"></div>
+              <div><button type="button" class="link-btn" id="addMember">+ Add member</button> <span class="sheet-note">for a project group with several borrowers</span></div>
               <div class="row2">
                 <div class="field"><label for="lnGroup">Group</label><input type="text" id="lnGroup" placeholder="e.g. ICNS25"></div>
                 <div class="field"><label for="lnCourse">Course</label><input type="text" id="lnCourse" placeholder="Type a course name or code"></div>
@@ -417,7 +429,6 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
                 <div class="field"><label for="lnStart">Start date</label><input type="date" id="lnStart" required></div>
                 <div class="field"><label for="lnEnd">End date (return by)</label><input type="date" id="lnEnd" required></div>
               </div>
-              <div class="field"><label for="lnContact">Contact (email or phone)</label><input type="text" id="lnContact" placeholder="e.g. firstname.lastname@edu.karelia.fi"></div>
               <div class="field"><label for="lnNotes">Notes</label><textarea id="lnNotes" rows="2" placeholder="Optional, not printed on the record"></textarea></div>
             </div>
           </div>
@@ -1157,7 +1168,8 @@ function rememberBorrower(l) {
 function peopleList() {
   const stats = new Map();
   for (const l of S.loans.values()) {
-    for (const key of [emailIn(l.contact).toLowerCase(), personKey(l.names)].filter(Boolean)) {
+    const people = l.members && l.members.length ? l.members.map(m => [emailIn(m.email), m.name]) : [[emailIn(l.contact), l.names]];
+    for (const key of [...new Set(people.flatMap(([e, n]) => [e.toLowerCase(), personKey(n)]).filter(Boolean))]) {
       const s = stats.get(key) || { loans: 0, lastAt: '', l: null };
       s.loans++; if ((l.createdAt || '') >= s.lastAt) { s.lastAt = l.createdAt || ''; s.l = l; }
       stats.set(key, s);
@@ -1650,9 +1662,41 @@ $('#draftTable').addEventListener('click', e => { const b = e.target.closest('[d
 function resetLoanForm() {
   $('#loanForm').reset(); S.draft = [];
   $('#lnStart').value = todayISO(); $('#lnEnd').value = addDays(todayISO(), 14); $('#lnEnd').min = todayISO();
+  $('#memberList').innerHTML = '';
   renderPicker(); renderDraft();
   for (const i of document.querySelectorAll('.num-step input[type=number]')) syncStepButtons(i);
 }
+/* project members: extra borrowers on the same loan */
+let memberSeq = 0;
+function addMemberRow(name = '', email = '') {
+  const n = ++memberSeq, row = document.createElement('div');
+  row.className = 'member-row';
+  row.innerHTML = `<div class="field"><label for="mName${n}">Member name</label><input type="text" id="mName${n}" placeholder="Name"></div>
+    <div class="field"><label for="mMail${n}">Email</label><input type="text" id="mMail${n}" placeholder="Email"></div>
+    <button type="button" class="rm" title="Remove this member" aria-label="Remove this member">×</button>`;
+  $('#memberList').appendChild(row);
+  const ni = row.querySelector('#mName' + n), mi = row.querySelector('#mMail' + n);
+  ni.value = name; mi.value = email;
+  const pick = p => { ni.value = p.name; if (contactOf(p)) mi.value = emailIn(contactOf(p)) || contactOf(p); };
+  attachSuggest(ni, { find: q => findPeople(q, ['name', 'username']), label: p => [p.name, [contactOf(p), p.group, studentNo(p)].filter(Boolean).join(' · '), personTag(p)],
+    isFilled: p => mi.value.trim() === (emailIn(contactOf(p)) || contactOf(p)), pick, remove: removeBorrower });
+  attachSuggest(mi, { find: q => findPeople(q, ['email', 'contact', 'name', 'username']), label: p => [contactOf(p) || p.name, contactOf(p) ? p.name : '', personTag(p)],
+    isFilled: p => ni.value.trim().toLowerCase() === (p.name || '').toLowerCase(), pick, remove: removeBorrower });
+  row.querySelector('.rm').addEventListener('click', () => row.remove());
+  return ni;
+}
+$('#addMember').addEventListener('click', () => addMemberRow().focus());
+// Everyone on the loan form: the main borrower first, then the members with a name.
+function formMembers() {
+  const out = [{ name: $('#lnNames').value.trim(), email: $('#lnContact').value.trim() }];
+  for (const row of document.querySelectorAll('#memberList .member-row')) {
+    const [ni, mi] = row.querySelectorAll('input');
+    if (ni.value.trim()) out.push({ name: ni.value.trim(), email: mi.value.trim() });
+  }
+  return out.filter(m => m.name);
+}
+// All email addresses of a loan (main borrower and members).
+const loanEmails = l => [...new Set([emailIn(l.contact), ...(l.members || []).map(m => emailIn(m.email))].filter(Boolean).map(e => e.toLowerCase()))];
 $('#lnClear').addEventListener('click', () => { resetLoanForm(); S.lastSaved = null; renderSaved(); S.reqReport = null; renderReqBox(); });
 
 /* ---------- fill the form from a filled-in loan request (the lab's Excel template) ----------
@@ -1704,7 +1748,7 @@ async function readLoanRequest(file) {
       }
       if (headRow) continue;
       const val = c => { for (let k = c; k <= c + 3; k++) { const v = raw(r, k); if (v !== null && v !== undefined && String(cellText(v)).trim() !== '') return v; } return ''; };
-      if (/^names?\b/.test(label)) fields.names = cellText(val(2)).trim();
+      if (/^(full )?names?\b/.test(label)) fields.names = cellText(val(2)).trim();
       else if (/^group/.test(label)) fields.group = cellText(val(2)).trim();
       else if (/^course/.test(label)) fields.course = cellText(val(2)).trim();
       else if (/^teacher/.test(label)) fields.teacher = cellText(val(2)).trim();
@@ -1731,18 +1775,25 @@ async function fillFromRequest(file) {
   if (!req) { toast('That file does not look like a loan request form.', 'bad'); return; }
   const { fields: f, lines } = req, report = { file: file.name, added: [], missing: [], short: [], notes: [] };
   resetLoanForm(); S.lastSaved = null; renderSaved();
-  if (f.names) $('#lnNames').value = f.names;
+  // several people: names separated by commas, "and" or new lines; emails in the same order
+  const people = (f.names || '').split(/\s*(?:,|;|\n| and | & )\s*/i).map(x => x.trim()).filter(Boolean);
+  const mails = (f.contact || '').match(/[^\s@,;:<>()"']+@[^\s@,;:<>()"']+\.[a-z]{2,}/gi) || [];
   if (f.group) $('#lnGroup').value = f.group;
   if (f.course) $('#lnCourse').value = f.course;
   // email: from the form if it has one, otherwise from the borrower list
-  let contact = f.contact || '';
-  if (!contact && f.names) {
-    const first = f.names.split(/,|;| and | & /i)[0].trim();
-    const b = findBorrower(first, '');
-    if (b && (b.email || b.contact)) { contact = b.contact || b.email; report.notes.push(`Email taken from the borrower list (${first}).`); }
-    else report.notes.push('No email found for this borrower. Add it in Contact if you want to email the record.');
-  }
-  if (contact) $('#lnContact').value = contact;
+  const noEmail = [];
+  people.forEach((name, i) => {
+    let email = mails[i] || (people.length === 1 ? (f.contact || '') : '');
+    if (!email) {
+      const b = findBorrower(name, '');
+      if (b && (b.email || b.contact)) { email = emailIn(b.email || b.contact) || b.contact; report.notes.push(`Email for ${name} taken from the borrower list.`); }
+      else noEmail.push(name);
+    }
+    if (i === 0) { $('#lnNames').value = name; $('#lnContact').value = email; }
+    else addMemberRow(name, email);
+  });
+  if (noEmail.length) report.notes.push(`No email found for ${noEmail.join(', ')}. Add it if you want to email the record.`);
+  if (people.length > 1) report.notes.push(`${people.length} borrowers: ${people.join(', ')}.`);
   if (f.teacher) $('#lnNotes').value = `Teacher: ${f.teacher}`;
   if (f.start) $('#lnStart').value = f.start;
   if (f.end) $('#lnEnd').value = f.end;
@@ -1787,14 +1838,14 @@ function makeRef(start) {
 $('#loanForm').addEventListener('submit', async e => {
   e.preventDefault();
   const names = $('#lnNames').value.trim(), start = $('#lnStart').value, end = $('#lnEnd').value;
-  if (!names) { toast('Enter the borrower name(s).', 'bad'); return; }
+  if (!names) { toast('Enter the borrower name.', 'bad'); return; }
   if (!start || !end) { toast('Set both the start and end date.', 'bad'); return; }
   if (end < start) { toast('End date is before the start date.', 'bad'); return; }
   if (!S.draft.length) { toast('Add at least one device to the loan.', 'bad'); return; }
   for (const d of S.draft) { const it = S.inv.get(d.itemId); if (!it) { toast(`${d.name} is no longer in the inventory.`, 'bad'); return; } }
-  const id = uid();
+  const id = uid(), members = formMembers();
   const loan = {
-    ref: makeRef(start), names, group: $('#lnGroup').value.trim(), course: $('#lnCourse').value.trim(),
+    ref: makeRef(start), names: members.map(m => m.name).join(', '), ...(members.length > 1 ? { members } : {}), group: $('#lnGroup').value.trim(), course: $('#lnCourse').value.trim(),
     contact: $('#lnContact').value.trim(), notes: $('#lnNotes').value.trim(), startDate: start, endDate: end,
     items: S.draft.map(d => ({ itemId: d.itemId, name: d.name, serial: d.serial, qty: d.qty, returnedQty: 0 })),
     status: 'active', createdAt: new Date().toISOString(), returnedAt: null, returnNotes: '', createdBy: whoAmI()
@@ -1803,7 +1854,7 @@ $('#loanForm').addEventListener('submit', async e => {
   const ok = await writeDoc('loans', id, loan);
   $('#lnSave').disabled = false;
   if (!ok) return;
-  rememberBorrower(loan);
+  for (const m of members) rememberBorrower({ names: m.name, contact: m.email, group: loan.group, course: loan.course });
   S.lastSaved = { ...loan, id }; S.reqReport = null; renderReqBox();
   resetLoanForm(); renderSaved();
   window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -1811,7 +1862,7 @@ $('#loanForm').addEventListener('submit', async e => {
 function renderSaved() {
   const box = $('#savedBox'), l = S.lastSaved;
   if (!l) { box.innerHTML = ''; return; }
-  const cur = S.loans.get(l.id) || l, to = emailIn(cur.contact);
+  const cur = S.loans.get(l.id) || l, to = loanEmails(cur).join(', ');
   box.innerHTML = `<div class="saved"><p><b>Loan saved for ${esc(l.names)}.</b> Ref <span class="serial">${esc(l.ref)}</span> · ${l.items.reduce((a, i) => a + i.qty, 0)} unit(s), due back ${fmtDate(l.endDate)}.</p>
     <div class="actions"><button class="btn primary" data-exp="pdf">Download PDF</button><button class="btn" data-exp="xlsx">Download Excel</button>
     <button class="btn" data-exp="print">Print</button>
@@ -1900,13 +1951,13 @@ function renderDetail() {
       <dt>Start</dt><dd class="mono">${fmtDate(l.startDate)}</dd>
       <dt>Due</dt><dd class="mono">${fmtDate(l.endDate)}</dd>
       ${l.returnedAt ? `<dt>Returned</dt><dd class="mono">${fmtDate(l.returnedAt)}</dd>` : ''}
-      ${l.contact ? `<dt>Contact</dt><dd>${esc(l.contact)}</dd>` : ''}
+      ${l.members && l.members.length > 1 ? `<dt>Members</dt><dd>${l.members.map(m => esc(m.name) + (m.email ? ` <span class="muted">· ${esc(m.email)}</span>` : '')).join('<br>')}</dd>` : l.contact ? `<dt>Contact</dt><dd>${esc(l.contact)}</dd>` : ''}
       ${l.notes ? `<dt>Notes</dt><dd>${esc(l.notes)}</dd>` : ''}
       ${l.createdBy ? `<dt>Lent by</dt><dd>${esc(l.createdBy)}</dd>` : ''}
       ${l.lastCheckedBy ? `<dt>Checked by</dt><dd>${esc(l.lastCheckedBy)}${l.lastCheckedAt ? ` · ${fmtDate(l.lastCheckedAt.slice(0, 10))}` : ''}</dd>` : ''}
     </dl>
     <div class="actions" style="margin-top:12px"><button class="btn small" data-d="pdf">Download PDF</button><button class="btn small" data-d="xlsx">Download Excel</button><button class="btn small" data-d="print">Print</button>
-      ${emailIn(l.contact) ? `<button class="btn small primary" data-d="email" title="Send the Excel record to ${esc(emailIn(l.contact))}">Email to borrower</button>` : `<button class="btn small" data-d="addemail">Add email</button>`}</div>
+      ${loanEmails(l).length ? `<button class="btn small primary" data-d="email" title="Send the Excel record to ${esc(loanEmails(l).join(', '))}">Email to borrower${loanEmails(l).length > 1 ? 's' : ''}</button>` : `<button class="btn small" data-d="addemail">Add email</button>`}</div>
     ${S.addingEmail === l.id ? `<div class="actions email-add"><input type="email" id="loanEmailInput" placeholder="borrower@edu.karelia.fi" aria-label="Borrower email"><button class="btn small primary" data-d="saveemail">Save</button><button class="btn small" data-d="cancelemail">Cancel</button></div>` : ''}
     <hr class="divider">
     <h3 style="margin-bottom:6px">Return check</h3>
@@ -2089,13 +2140,13 @@ function loanEmailBody(l) {
   return lines.join('\r\n');
 }
 async function emailLoan(l) {
-  const to = emailIn(l.contact);
-  if (!to) { toast('This loan has no email address. Add one first.', 'bad'); return; }
+  const list = loanEmails(l), to = list.join(', ');
+  if (!list.length) { toast('This loan has no email address. Add one first.', 'bad'); return; }
   const blob = await buildXlsx(l); if (!blob) return;
   const filename = loanFileBase(l) + '.xlsx';
   await offerFile(filename, blob);
   const subject = `ICT Laboratory equipment loan ${l.ref || ''}`.trim();
-  const href = `mailto:${encodeURIComponent(to).replace('%40', '@')}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(loanEmailBody(l))}`;
+  const href = `mailto:${list.map(e => encodeURIComponent(e).replace('%40', '@')).join(',')}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(loanEmailBody(l))}`;
   setTimeout(() => {
     const a = document.createElement('a'); a.href = href; document.body.appendChild(a); a.click(); a.remove();
     toast(`Email to ${to} opened. Attach “${filename}” from your Downloads folder, then send.`);
