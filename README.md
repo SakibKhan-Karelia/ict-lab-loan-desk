@@ -3,7 +3,7 @@
 Inventory and equipment loan register for the ICT Laboratory at Karelia University of Applied Sciences.
 It keeps track of the lab's devices, records who has borrowed what, produces the paper loan record for signing, and helps check equipment back in.
 
-**Live site:** https://sakibkhan-karelia.github.io/ict-lab-loan-desk/
+**Live site:** https://ictlabloandesk.github.io/
 
 ## Features
 
@@ -67,7 +67,7 @@ It keeps track of the lab's devices, records who has borrowed what, produces the
 This repository only holds the app (and `users.json`, see Users below). **No student, loan or inventory data is stored here.** It is safe for this repository to be public:
 visitors without a login can't see or change any data.
 
-The app saves its data in a separate **private** repository (`SakibKhan-Karelia/ict-lab-loan-data`), one file per kind of data.
+The app saves its data in a separate **private** repository (`ictlabloandesk/ict-lab-loan-data`), one file per kind of data.
 Each change is one commit that only touches the files it changed:
 
 | File | What it holds |
@@ -85,7 +85,8 @@ The commit list of the data repository is also a full record of who changed what
 ### Connecting a browser (owner)
 
 1. Create a fine-grained personal access token at <https://github.com/settings/personal-access-tokens/new>:
-   - Repository access: **Only select repositories**, then choose `ict-lab-loan-data` (and `ict-lab-loan-desk` if you use user logins, see below).
+   - Resource owner: **ictlabloandesk** (the organisation, not your personal account).
+   - Repository access: **Only select repositories**, then choose `ict-lab-loan-data` (and `ictlabloandesk.github.io` if you use user logins, see below).
    - Repository permissions: **Contents: Read and write**.
 2. Open the site, press **Set up GitHub storage** (or **Connect with your GitHub token** on the Sign in screen), paste the token and press **Connect**.
 3. The status at the bottom of the sidebar should say **Saved to GitHub**.
@@ -98,8 +99,9 @@ One or two users can use the app in the owner's absence with a username and pass
 Users can use the whole app: inventory, loans and return checks. They can't manage users. Every change they save shows their username.
 
 **One-time setup (owner):**
-1. Edit your own token at <https://github.com/settings/personal-access-tokens> and add the repository **`ict-lab-loan-desk`** (Contents: Read and write), so the app can save the list of users.
+1. Edit your own token at <https://github.com/settings/personal-access-tokens> and add the repository **`ictlabloandesk.github.io`** (Contents: Read and write), so the app can save the list of users.
 2. Create a **second** fine-grained token just for users, for example "Loan desk users", at <https://github.com/settings/personal-access-tokens/new>:
+   - Resource owner: **ictlabloandesk**.
    - Repository access: **Only select repositories**, then **`ict-lab-loan-data` only**.
    - Repository permissions: **Contents: Read and write**.
    - Don't use your own token for this. The user token can't touch the website.
@@ -153,6 +155,7 @@ The app uses [jsPDF](https://github.com/parallax/jsPDF) for PDF files and [Excel
 
 New features are listed here, newest first.
 
+- **2026-11-06**: Moved to the `ictlabloandesk` GitHub organisation; the site is now at https://ictlabloandesk.github.io/.
 - **2026-11-05**: History columns renamed (Timestamp, User, Action, Description); Export to Excel on the History page.
 - **2026-11-05**: Borrower email: removed the attachment line and the sign-off.
 - **2026-11-05**: Select and delete entries on the History page.
