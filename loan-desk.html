@@ -216,6 +216,9 @@ tr.confirm td{background:var(--bad-soft)}
 .picker{display:grid;grid-template-columns:minmax(0,2fr) 140px minmax(0,1.3fr) auto;gap:10px;align-items:end;padding:14px 18px;border-bottom:1px solid var(--line);background:var(--sunken)}
 @media (max-width:640px){.picker{grid-template-columns:minmax(0,1fr) 140px}.picker .field:nth-child(3){grid-column:1/-1}.picker .btn{grid-column:1/-1;justify-content:center}}
 .form-foot{display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:flex-end;padding:14px 18px;border-top:1px solid var(--line)}
+.req-box{border:1px solid color-mix(in srgb,var(--accent) 45%,var(--line));background:var(--info-soft);border-radius:4px;padding:14px 18px;display:grid;gap:8px}
+.req-box ul{margin:0;padding-left:20px}
+.req-box .warn-list li{color:var(--warn)}
 .saved{border:1px solid color-mix(in srgb,var(--ok) 40%,var(--line));background:var(--ok-soft);border-radius:4px;padding:14px 18px;display:grid;gap:10px}
 
 /* loans */
@@ -394,8 +397,13 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
       <section id="view-new" class="view" role="tabpanel" aria-labelledby="tab-new" hidden>
         <div class="page-head">
           <h1>New loan</h1>
+          <div class="toolbar">
+            <button class="btn" type="button" id="reqUpload" title="Upload a filled-in loan request (Excel) to fill in this form">Fill from request form</button>
+            <input type="file" id="reqFile" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden>
+          </div>
         </div>
         <div id="savedBox"></div>
+        <div id="reqBox"></div>
         <form id="loanForm" autocomplete="off" class="loan-grid">
           <div class="box">
             <div class="box-head"><h2>Borrower</h2><div class="actions"><span class="sheet-note" id="dirInfo"></span></div></div>
@@ -1645,7 +1653,133 @@ function resetLoanForm() {
   renderPicker(); renderDraft();
   for (const i of document.querySelectorAll('.num-step input[type=number]')) syncStepButtons(i);
 }
-$('#lnClear').addEventListener('click', () => { resetLoanForm(); S.lastSaved = null; renderSaved(); });
+$('#lnClear').addEventListener('click', () => { resetLoanForm(); S.lastSaved = null; renderSaved(); S.reqReport = null; renderReqBox(); });
+
+/* ---------- fill the form from a filled-in loan request (the lab's Excel template) ----------
+   Fields are found by their labels in column A (Name(s), Group, Course, Teacher, Email, Start Date, End Date),
+   devices from the rows under the "Device/Component name" header. */
+const normName = v => String(v || '').toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
+function matchDevice(text) {
+  const q = normName(text); if (!q) return null;
+  const items = [...S.inv.values()];
+  let hit = items.find(i => normName(i.name) === q); if (hit) return hit;
+  const qt = new Set(q.split(' '));
+  let best = null, bestScore = 0;
+  for (const i of items) {
+    const n = normName(i.name); if (!n) continue;
+    const nt = n.split(' ');
+    const common = nt.filter(t => qt.has(t)).length;
+    let score = common / Math.max(qt.size, nt.length);
+    if (n.includes(q) || q.includes(n)) score = Math.max(score, 0.75 - Math.abs(n.length - q.length) / 200);
+    if (score > bestScore) { bestScore = score; best = i; }
+  }
+  return bestScore >= 0.6 ? best : null;
+}
+function excelDate(v) {
+  if (v instanceof Date && !isNaN(v)) return v.toISOString().slice(0, 10);
+  if (typeof v === 'number' && v > 20000 && v < 80000) return new Date(Date.UTC(1899, 11, 30) + v * 86400000).toISOString().slice(0, 10);
+  const t = String(v || '').trim();
+  let m = t.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{4})$/); if (m) return `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`;
+  m = t.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/); if (m) return `${m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}`;
+  return '';
+}
+async function readLoanRequest(file) {
+  const wb = new ExcelJS.Workbook();
+  await wb.xlsx.load(await file.arrayBuffer());
+  for (const ws of wb.worksheets) {
+    const raw = (r, c) => { const v = ws.getRow(r).getCell(c).value; return v && typeof v === 'object' && !(v instanceof Date) ? (v.result !== undefined ? v.result : cellText(v)) : v; };
+    const text = (r, c) => cellText(raw(r, c)).trim();
+    const fields = {}; let headRow = 0, cols = {};
+    for (let r = 1; r <= Math.min(ws.rowCount, 200); r++) {
+      const label = normName(text(r, 1));
+      if (!headRow) {
+        for (let c = 1; c <= Math.max(ws.columnCount, 6); c++) {
+          const h = normName(text(r, c));
+          if (/device|component name/.test(h) && !cols.name) cols.name = c;
+          else if (/serial/.test(h)) cols.serial = c;
+          else if (/number|quantity|qty|amount|pcs/.test(h)) cols.qty = c;
+        }
+        if (cols.name) { headRow = r; continue; }
+        cols = {};
+      }
+      if (headRow) continue;
+      const val = c => { for (let k = c; k <= c + 3; k++) { const v = raw(r, k); if (v !== null && v !== undefined && String(cellText(v)).trim() !== '') return v; } return ''; };
+      if (/^names?\b/.test(label)) fields.names = cellText(val(2)).trim();
+      else if (/^group/.test(label)) fields.group = cellText(val(2)).trim();
+      else if (/^course/.test(label)) fields.course = cellText(val(2)).trim();
+      else if (/^teacher/.test(label)) fields.teacher = cellText(val(2)).trim();
+      else if (/^e ?mail|contact/.test(label)) fields.contact = cellText(val(2)).trim();
+      else if (/^start/.test(label)) fields.start = excelDate(raw(r, 2));
+      else if (/^(end|return)/.test(label)) fields.end = excelDate(raw(r, 2));
+    }
+    if (!headRow && !fields.names) continue;
+    const lines = [];
+    if (headRow) for (let r = headRow + 1; r <= ws.rowCount; r++) {
+      const name = text(r, cols.name); if (!name) continue;
+      const q = cols.qty ? parseInt(String(cellText(raw(r, cols.qty))).replace(/[^0-9]/g, ''), 10) : NaN;
+      lines.push({ row: r, name, serial: cols.serial ? text(r, cols.serial) : '', qty: Number.isFinite(q) && q > 0 ? q : 1 });
+    }
+    return { fields, lines };
+  }
+  return null;
+}
+async function fillFromRequest(file) {
+  if (!window.ExcelJS) { toast('The Excel tool did not load. Reload the page and try again.', 'bad'); return; }
+  if (!/\.xlsx$/i.test(file.name)) { toast('Choose the filled-in request form as an .xlsx file.', 'bad'); return; }
+  let req;
+  try { req = await readLoanRequest(file); } catch (e) { toast('Could not read that Excel file.', 'bad'); return; }
+  if (!req) { toast('That file does not look like a loan request form.', 'bad'); return; }
+  const { fields: f, lines } = req, report = { file: file.name, added: [], missing: [], short: [], notes: [] };
+  resetLoanForm(); S.lastSaved = null; renderSaved();
+  if (f.names) $('#lnNames').value = f.names;
+  if (f.group) $('#lnGroup').value = f.group;
+  if (f.course) $('#lnCourse').value = f.course;
+  // email: from the form if it has one, otherwise from the borrower list
+  let contact = f.contact || '';
+  if (!contact && f.names) {
+    const first = f.names.split(/,|;| and | & /i)[0].trim();
+    const b = findBorrower(first, '');
+    if (b && (b.email || b.contact)) { contact = b.contact || b.email; report.notes.push(`Email taken from the borrower list (${first}).`); }
+    else report.notes.push('No email found for this borrower. Add it in Contact if you want to email the record.');
+  }
+  if (contact) $('#lnContact').value = contact;
+  if (f.teacher) $('#lnNotes').value = `Teacher: ${f.teacher}`;
+  if (f.start) $('#lnStart').value = f.start;
+  if (f.end) $('#lnEnd').value = f.end;
+  $('#lnEnd').min = $('#lnStart').value;
+  if ($('#lnEnd').value < $('#lnStart').value) { $('#lnEnd').value = addDays($('#lnStart').value, 14); report.notes.push('The end date was before the start date, so it was set to two weeks after the start.'); }
+  if (!f.start) report.notes.push('No start date in the form; today is used.');
+  if (!f.end) report.notes.push('No end date in the form; two weeks from the start is used.');
+  for (const ln of lines) {
+    const it = matchDevice(ln.name);
+    if (!it) { report.missing.push(`${ln.name} (${ln.qty})`); continue; }
+    const av = availableFor(it.id);
+    if (av <= 0) { report.short.push(`${it.name}: none available (asked for ${ln.qty})`); continue; }
+    const qty = Math.min(ln.qty, av);
+    if (qty < ln.qty) report.short.push(`${it.name}: only ${av} available (asked for ${ln.qty})`);
+    const serial = ln.serial || it.serial || '';
+    const same = S.draft.find(d => d.itemId === it.id && d.serial === serial);
+    if (same) same.qty += qty; else S.draft.push({ key: uid(), itemId: it.id, name: it.name, serial, qty });
+    report.added.push(`${qty} × ${it.name}${normName(it.name) !== normName(ln.name) ? ` (form said “${ln.name}”)` : ''}`);
+  }
+  renderPicker(); renderDraft();
+  S.reqReport = report; renderReqBox();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+function renderReqBox() {
+  const r = S.reqReport, box = $('#reqBox');
+  if (!r) { box.innerHTML = ''; return; }
+  const list = (title, items, cls) => items.length ? `<div><b>${title}</b><ul class="${cls || ''}">${items.map(x => `<li>${esc(x)}</li>`).join('')}</ul></div>` : '';
+  box.innerHTML = `<div class="req-box"><p><b>Filled in from ${esc(r.file)}.</b> Check the details below, then press <b>Save loan</b>.</p>
+    ${list(`Devices added (${r.added.length})`, r.added)}
+    ${list('Not found in the inventory (add them by hand)', r.missing, 'warn-list')}
+    ${list('Not enough available', r.short, 'warn-list')}
+    ${list('Notes', r.notes)}
+    <div class="actions"><button class="btn small" type="button" id="reqDismiss">Dismiss</button></div></div>`;
+}
+$('#reqUpload').addEventListener('click', () => $('#reqFile').click());
+$('#reqFile').addEventListener('change', e => { const f = e.target.files[0]; e.target.value = ''; if (f) fillFromRequest(f); });
+$('#reqBox').addEventListener('click', e => { if (e.target.id === 'reqDismiss') { S.reqReport = null; renderReqBox(); } });
 function makeRef(start) {
   const [y, m, d] = (start || todayISO()).split('-');
   return `L${y.slice(2)}${m}${d}-${Math.random().toString(36).slice(2, 5).toUpperCase()}`;
@@ -1670,7 +1804,7 @@ $('#loanForm').addEventListener('submit', async e => {
   $('#lnSave').disabled = false;
   if (!ok) return;
   rememberBorrower(loan);
-  S.lastSaved = { ...loan, id };
+  S.lastSaved = { ...loan, id }; S.reqReport = null; renderReqBox();
   resetLoanForm(); renderSaved();
   window.scrollTo({ top: 0, behavior: 'smooth' });
 });

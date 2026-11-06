@@ -32,6 +32,7 @@ It keeps track of the lab's devices, records who has borrowed what, produces the
 - **Course suggestions**: type a course name or code (for example "iot" or "IC10028") to pick a course from the ICT curriculum. Courses typed in earlier loans are suggested too.
 - The end date can't be before the start date. Moving the start date past the end date moves the end date to two weeks after the start.
 - Pick devices from the inventory with number and serial number. You can't lend more than is available.
+- **Fill from request form** (top right): upload a filled-in copy of the lab's loan request Excel template ("ICT Laboratory equipment borrow"). The form is filled in for you: Name(s), Group, Course, Start and End date, the teacher (into Notes) and the devices with serial numbers and numbers. Devices are matched to the inventory by name, even when written a little differently, and limited to what is available. The email is taken from the form if it has an Email row, otherwise from the borrower list. A summary shows what was added, which devices were not found or not available, and anything else to check. Nothing is saved until you press **Save loan**; the normal way of creating a loan is unchanged.
 - After saving: **Download PDF**, **Download Excel**, **Print** or **Email to borrower**.
 
 ### Loan record (PDF / Excel / Print)
@@ -155,6 +156,7 @@ The app uses [jsPDF](https://github.com/parallax/jsPDF) for PDF files and [Excel
 
 New features are listed here, newest first.
 
+- **2026-11-06**: Fill from request form: upload a filled-in loan request (Excel) to fill in the New loan form.
 - **2026-11-06**: GitHub storage panel simplified: no instruction text and no Data file box (the four data files are always at the top of the data repository).
 - **2026-11-06**: Moved to the `ictlabloandesk` GitHub organisation; the site is now at https://ictlabloandesk.github.io/.
 - **2026-11-05**: History columns renamed (Timestamp, User, Action, Description); Export to Excel on the History page.
