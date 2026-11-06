@@ -25,7 +25,7 @@ It keeps track of the lab's devices, records who has borrowed what, produces the
 
 ### New loan
 - Fields: Name and Email (or phone) of the borrower, Group, Course, Start date, End date and Notes (not printed).
-- **+ Add member** adds more borrowers for a project group, each with a name and email (with the same suggestions). All names are printed on the loan record, everyone is added to the borrower list, the loan page lists all members, and **Email to borrowers** writes to all of them. Use × to remove a member row.
+- **+ Add member** adds more borrowers for a project group: just a name (with the same name suggestions); the one email above is enough for the loan. All names are printed on the loan record, everyone is added to the borrower list and the loan page lists all members. Use × to remove a member row.
 - **Name and email suggestions**: start typing a name, an email or a student number. Matching people are listed: those who borrowed before first (marked "borrowed 2×" and so on), then everyone else on the borrower list. To add many people at once, add them to `borrowers.json` in the data repository. Use the mouse, or ↓ / ↑ and Enter. Picking one fills in the name and email, and the group and course if they are empty.
 - **New borrowers are added automatically**: when a loan is saved for a name or email that is not on the borrower list yet, that person is added (marked as "added"). For people already on the list, the latest group, course and contact are kept.
 - **Remove someone from the borrower list**: press the **×** next to a name in the suggestions (or highlight it with ↓ / ↑ and press Delete), then **Remove**. Their loans are kept; the removal is listed on the History page. Importing a list again brings them back if they are in it.
@@ -33,7 +33,7 @@ It keeps track of the lab's devices, records who has borrowed what, produces the
 - **Course suggestions**: type a course name or code (for example "iot" or "IC10028") to pick a course from the ICT curriculum. Courses typed in earlier loans are suggested too.
 - The end date can't be before the start date. Moving the start date past the end date moves the end date to two weeks after the start.
 - Pick devices from the inventory with number and serial number. You can't lend more than is available.
-- **Fill from request form** (top right): upload a filled-in copy of the lab's "ICT Laboratory Equipment Loan Request Form" (Excel). The form is filled in for you: Full Name, Group, Course, Email, Start and End date, the teacher (into Notes) and the devices with serial numbers and numbers. Devices are matched to the inventory by name, even when written a little differently, and limited to what is available. Several names in Full Name (separated by commas, "and" or new lines) become separate members; emails in the Email row are matched to them in the same order, and anyone without one gets their email from the borrower list. A summary shows what was added, which devices were not found or not available, and anything else to check. Nothing is saved until you press **Save loan**; the normal way of creating a loan is unchanged.
+- **Fill from request form** (top right): upload a filled-in copy of the lab's "ICT Laboratory Equipment Loan Request Form" (Excel). The form is filled in for you: Full Name, Group, Course, Email, Start and End date, the teacher (into Notes) and the devices with serial numbers and numbers. Devices are matched to the inventory by name, even when written a little differently, and limited to what is available. Several names in Full Name (separated by commas, "and" or new lines) become separate members. The Email row is used as the loan's email; if it is empty, the first person's email is taken from the borrower list. A summary shows what was added, which devices were not found or not available, and anything else to check. Nothing is saved until you press **Save loan**; the normal way of creating a loan is unchanged.
 - After saving: **Download PDF**, **Download Excel**, **Print** or **Email to borrower**.
 
 ### Loan record (PDF / Excel / Print)
@@ -157,6 +157,7 @@ The app uses [jsPDF](https://github.com/parallax/jsPDF) for PDF files and [Excel
 
 New features are listed here, newest first.
 
+- **2026-11-06**: Project members are names only; one email per loan.
 - **2026-11-06**: Several borrowers per loan (+ Add member) for project groups; Fill from request form reads the new request form (Full Name, Email) and several names.
 - **2026-11-06**: Fill from request form: upload a filled-in loan request (Excel) to fill in the New loan form.
 - **2026-11-06**: GitHub storage panel simplified: no instruction text and no Data file box (the four data files are always at the top of the data repository).
